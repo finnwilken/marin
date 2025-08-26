@@ -54,7 +54,13 @@ public class AnalysisRunner {
 
   public static void main(String[] args){
     MavenCentralAnalysis myAnalysis = new MyAnalysisImplementation();
-    myAnalysis.runAnalysis(args);
+
+    try {
+      myAnalysis.runAnalysis(args);
+    } catch (Exception e) {
+      System.err.println("Error while running Analysis: " + e.getMessage());
+    }
+    
   }
 
 }
@@ -68,84 +74,87 @@ You can run each example on the first 1000 Maven artifacts by invoking `java -ja
 
 ### Counting all classFiles from jar artifacts:
 ``` java
-public class ExampleImplementation extends MavenCentralAnalysis {
+public class ClassFileCountImplementation extends MavenCentralAnalysis {
+
     private long numberOfClassfiles;
-    
-    public ExampleImplementation() {
-      super();
-      numberOfClassfiles = 0;
+
+    public ClassFileCountImplementation() {
+        super();
+        this.resolveJar = true;
+        this.numberOfClassfiles = 0;
     }
-    
+
     @Override
     public void analyzeArtifact(Artifact toAnalyze) {
         if(toAnalyze.getJarInformation() != null) {
-          numberOfClassfiles += toAnalyze.getJarInformation().getNumClassFiles();
+            numberOfClassfiles += toAnalyze.getJarInformation().getNumClassFiles();
         }
     }
 
     public long getNumberOfClassfiles() {
         return numberOfClassfiles;
     }
-}  
+}
 ```
 
 ### Find all Unique Licenses from pom artifacts
 ``` java
-public class ExampleImplementation extends MavenCentralAnalysis {
-    private Set<License> uniqueLicenses;
+public class LicenseImplementation extends MavenCentralAnalysis {
+    private final Set<License> uniqueLicenses;
 
-    public ExampleImplementation() {
-      super();
-      uniqueLicenses = new HashSet<>();
-    }  
+    public LicenseImplementation() {
+        super();
+        this.resolvePom = true;
+        this.uniqueLicenses = new HashSet<>();
+    }
 
     @Override
     public void analyzeArtifact(Artifact toAnalyze) {
         if(toAnalyze.getPomInformation() != null) {
-          PomInformation info = toAnalyze.getPomInformation();
-          if(!info.getRawPomFeatures().getLicenses().isEmpty()) {
-              for(License license : info.getRawPomFeatures().getLicenses()) {
-                  if(!uniqueLicenses.contains(license)) {
-                      uniqueLicenses.add(license);
-                  }
-              }    
-          }
+            PomInformation info = toAnalyze.getPomInformation();
+            if(!info.getRawPomFeatures().getLicenses().isEmpty()) {
+                for(License license : info.getRawPomFeatures().getLicenses()) {
+                    uniqueLicenses.add(license);
+                }
+            }
         }
     }
 
     public Set<License> getUniqueLicenses() {
         return uniqueLicenses;
     }
-} 
+}
 ```
 
 ### Collect all artifacts that have javadocs
 ``` java
-public class ExampleImplementation extends MavenCentralAnalysis {
-    private Set<Artifact> hasJavadocs;
+public class JavaDocImplementation extends MavenCentralAnalysis {
 
-    public ExampleImplementation() {
-      super();
-      hasJavadocs = new HashSet<>();
-    }  
+    private final Set<Artifact> hasJavadocs;
+
+    public JavaDocImplementation() {
+        super();
+        this.resolveIndex = true;
+        this.hasJavadocs = new HashSet<>();
+    }
 
     @Override
     public void analyzeArtifact(Artifact toAnalyze) {
         if(toAnalyze.getIndexInformation() != null) {
-          List<Package> packages = toAnalyze.getIndexInformation().getPackages();
-          for(Package current : packages) {
-            if(current.getJavadocExists() > 0) {
-              hasJavadocs.add(toAnalyze);
-              break;
+            List<Package> packages = toAnalyze.getIndexInformation().getPackages();
+            for(Package current : packages) {
+                if(current.getJavadocExists() > 0) {
+                    hasJavadocs.add(toAnalyze);
+                    break;
+                }
             }
-          }
         }
     }
 
     public Set<Artifact> getHasJavadocs() {
         return hasJavadocs;
     }
-}  
+}
 ```
 
 ## IndexWalker
