@@ -88,8 +88,6 @@ public class ClassFileCountImplementation extends MavenCentralAnalysis {
         if(toAnalyze.getJarInformation() != null) {
             numberOfClassfiles += toAnalyze.getJarInformation().getNumClassFiles();
         }
-        URI ArtifactJarURI = toAnalyze.getIdent().getMavenCentralJarUri();
-        System.out.println(ArtifactJarURI);
     }
 
     public long getNumberOfClassfiles() {
