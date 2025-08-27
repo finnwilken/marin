@@ -79,8 +79,7 @@ public class ClassFileCountImplementation extends MavenCentralAnalysis {
     private long numberOfClassfiles;
 
     public ClassFileCountImplementation() {
-        super();
-        this.resolveJar = true;
+        super(false, false, false, true);
         this.numberOfClassfiles = 0;
     }
 
@@ -89,6 +88,8 @@ public class ClassFileCountImplementation extends MavenCentralAnalysis {
         if(toAnalyze.getJarInformation() != null) {
             numberOfClassfiles += toAnalyze.getJarInformation().getNumClassFiles();
         }
+        URI ArtifactJarURI = toAnalyze.getIdent().getMavenCentralJarUri();
+        System.out.println(ArtifactJarURI);
     }
 
     public long getNumberOfClassfiles() {
@@ -103,8 +104,7 @@ public class LicenseImplementation extends MavenCentralAnalysis {
     private final Set<License> uniqueLicenses;
 
     public LicenseImplementation() {
-        super();
-        this.resolvePom = true;
+        super(false, true, false, false);
         this.uniqueLicenses = new HashSet<>();
     }
 
@@ -133,8 +133,7 @@ public class JavaDocImplementation extends MavenCentralAnalysis {
     private final Set<Artifact> hasJavadocs;
 
     public JavaDocImplementation() {
-        super();
-        this.resolveIndex = true;
+        super(true, false, false, false);
         this.hasJavadocs = new HashSet<>();
     }
 
@@ -154,6 +153,7 @@ public class JavaDocImplementation extends MavenCentralAnalysis {
     public Set<Artifact> getHasJavadocs() {
         return hasJavadocs;
     }
+
 }
 ```
 
