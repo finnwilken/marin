@@ -10,6 +10,7 @@ import org.tudo.sse.model.pom.License;
 import org.tudo.sse.model.pom.PomInformation;
 import org.tudo.sse.testutils.DummyEvaluationAnalysis;
 import org.tudo.sse.utils.IndexIterator;
+import org.tudo.sse.utils.MavenCentralAnalysisFactory;
 import scala.Tuple2;
 
 import java.io.*;
@@ -22,7 +23,7 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MavenCentralAnalysisTest {
-    DummyEvaluationAnalysis tester = new DummyEvaluationAnalysis();
+    final MavenCentralAnalysis analysisUnderTest = MavenCentralAnalysisFactory.buildEmptyAnalysisWithIndexRequirement();
     final String base = "https://repo1.maven.org/maven2/";
     final Map<String, Object> json;
     final Gson gson = new Gson();
@@ -58,12 +59,7 @@ class MavenCentralAnalysisTest {
 
             int i = 0;
             for(String[] input : cliInputs) {
-                MavenCentralAnalysis tester = new MavenCentralAnalysis() {
-                    @Override
-                    public void analyzeArtifact(Artifact current) {
-
-                    }
-                };
+                MavenCentralAnalysis tester = MavenCentralAnalysisFactory.buildEmptyAnalysisWithNoRequirements();
                 tester.parseCmdLine(input);
                 CliInformation result = tester.getSetupInfo();
                 List<String> currentExp = expected.get(i);
@@ -113,7 +109,7 @@ class MavenCentralAnalysisTest {
         cliInputs.add(args);
 
         for(String[] input : cliInputs) {
-            assertThrows(RuntimeException.class, () -> tester.parseCmdLine(input));
+            assertThrows(RuntimeException.class, () -> analysisUnderTest.parseCmdLine(input));
         }
     }
 
@@ -133,7 +129,7 @@ class MavenCentralAnalysisTest {
 
             try {
                 IndexIterator iterator = new IndexIterator(new URI(base), start1);
-                List<Artifact> collected1 = new ArrayList<>(tester.walkPaginated(take, iterator));
+                List<Artifact> collected1 = new ArrayList<>(analysisUnderTest.walkPaginated(take, iterator));
 
                 Artifact lastOne = collected1.get(collected1.size() - 1);
                 int i = 2;
@@ -144,7 +140,7 @@ class MavenCentralAnalysisTest {
 
                 iterator = new IndexIterator(new URI(base), start2);
 
-                List<Artifact> collected2 = new ArrayList<>(tester.walkPaginated(1, iterator));
+                List<Artifact> collected2 = new ArrayList<>(analysisUnderTest.walkPaginated(1, iterator));
                 assertEquals(lastOne.getIndexInformation().getIndex(), collected2.get(0).getIndexInformation().getIndex());
             } catch (IOException | URISyntaxException e) {
                 throw new RuntimeException(e);
@@ -154,6 +150,7 @@ class MavenCentralAnalysisTest {
 
     @Test
     void indexProcessor() {
+
         List<String[]> cliInputs = new ArrayList<>();
         String[] args = {"-st", "200:70"};
         cliInputs.add(args);
@@ -169,12 +166,9 @@ class MavenCentralAnalysisTest {
         int i = 0;
         for(String[] arg : cliInputs) {
             try {
-                if(i == 2) {
-                    tester.setIndex(true);
-                }
-                tester.parseCmdLine(arg);
-                CliInformation current = tester.getSetupInfo();
-                tester.indexProcessor();
+                analysisUnderTest.parseCmdLine(arg);
+                CliInformation current = analysisUnderTest.getSetupInfo();
+                analysisUnderTest.indexProcessor();
 
                 long ending = getEndingIndex(current.getName());
                 assertEquals(expectedEndings[i], ending);
@@ -208,10 +202,7 @@ class MavenCentralAnalysisTest {
        int i = 0;
         for(String[] arg : cliInputs) {
             List<String> curExpected = expected.get(i);
-            MavenCentralAnalysis tester = new MavenCentralAnalysis() {
-                @Override
-                public void analyzeArtifact(Artifact current) {}
-            };
+            MavenCentralAnalysis tester = MavenCentralAnalysisFactory.buildEmptyAnalysisWithNoRequirements();
             tester.parseCmdLine(arg);
             CliInformation current = tester.getSetupInfo();
             List<ArtifactIdent> idents = tester.readIdentsIn();
@@ -254,13 +245,7 @@ class MavenCentralAnalysisTest {
 
         for(int i = 0; i < singleArgs.size(); i++) {
          try {
-             MavenCentralAnalysis tester = new MavenCentralAnalysis() {
-                 @Override
-                 public void analyzeArtifact(Artifact current) {
-
-                 }
-             };
-             tester.resolvePom = true;
+             MavenCentralAnalysis tester = MavenCentralAnalysisFactory.buildEmptyAnalysisWithPomRequirement();
              Map<ArtifactIdent, Artifact> singleResult = tester.runAnalysis(singleArgs.get(i));
              Map<ArtifactIdent, Artifact> multiResult = tester.runAnalysis(multiArgs.get(i));
              assertEquals(singleResult.size(), multiResult.size());
@@ -275,7 +260,7 @@ class MavenCentralAnalysisTest {
     }
     @Test
     void checkUseCases() {
-        MavenCentralAnalysis jarUseCase = new MavenCentralAnalysis() {
+        MavenCentralAnalysis jarUseCase = new MavenCentralAnalysis(false, false, false, true) {
             public long numberOfClassfiles = 0;
             @Override
             public void analyzeArtifact(Artifact current) {
@@ -285,11 +270,9 @@ class MavenCentralAnalysisTest {
             }
 
         };
-
-        jarUseCase.resolveJar = true;
         assertDoesNotThrow( () -> jarUseCase.runAnalysis(new String[]{"-st", "0:300"}));
 
-        MavenCentralAnalysis pomUseCase = new MavenCentralAnalysis() {
+        MavenCentralAnalysis pomUseCase = new MavenCentralAnalysis(false, true, false, false) {
             public final Set<License> uniqueLicenses = new HashSet<>();
             @Override
             public void analyzeArtifact(Artifact toAnalyze) {
@@ -306,10 +289,9 @@ class MavenCentralAnalysisTest {
             }
         };
 
-        pomUseCase.resolvePom = true;
         assertDoesNotThrow( () -> pomUseCase.runAnalysis(new String[]{"-st", "0:300"}));
 
-        MavenCentralAnalysis indexUseCase = new MavenCentralAnalysis() {
+        MavenCentralAnalysis indexUseCase = new MavenCentralAnalysis(true, false, false, false) {
             public final Set<Artifact> hasJavadocs = new HashSet<>();
             @Override
             public void analyzeArtifact(Artifact toAnalyze) {
@@ -325,7 +307,6 @@ class MavenCentralAnalysisTest {
             }
         };
 
-        indexUseCase.resolveIndex = true;
         assertDoesNotThrow( () -> indexUseCase.runAnalysis(new String[]{"-st", "0:300"}));
     }
 
