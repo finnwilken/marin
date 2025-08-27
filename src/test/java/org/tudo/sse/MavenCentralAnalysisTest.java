@@ -8,7 +8,6 @@ import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.index.Package;
 import org.tudo.sse.model.pom.License;
 import org.tudo.sse.model.pom.PomInformation;
-import org.tudo.sse.testutils.DummyEvaluationAnalysis;
 import org.tudo.sse.utils.IndexIterator;
 import org.tudo.sse.utils.MavenCentralAnalysisFactory;
 import scala.Tuple2;
