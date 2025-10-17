@@ -98,7 +98,7 @@
         <dependency>
             <groupId>de.opal-project</groupId>
             <artifactId>framework_2.13</artifactId>
-            <version>5.0.0</version>
+            <version>6.0.0</version>
         </dependency>
 
         <!-- The following dependencies are pinned (lower bound) to avoid vulnerabilities in transitive dependencies -->

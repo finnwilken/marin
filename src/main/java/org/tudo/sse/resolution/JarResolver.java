@@ -5,7 +5,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opalj.br.ClassFile;
 import org.opalj.br.Method;
-import org.opalj.br.ObjectType;
+import org.opalj.br.ClassType;
 import org.opalj.br.analyses.Project$;
 import org.opalj.br.package$;
 import org.opalj.br.reader.Java16LibraryFramework;
@@ -212,7 +212,7 @@ public class JarResolver {
         }
 
         if(!classFile.interfaceTypes().isEmpty()) {
-            for(ObjectType type : JavaConverters.asJava(classFile.interfaceTypes())) {
+            for(ClassType type : JavaConverters.asJava(classFile.interfaceTypes())) {
                 interfaces.add(new ObjType(type.id(), type.fqn(), type.packageName()));
             }
         }
