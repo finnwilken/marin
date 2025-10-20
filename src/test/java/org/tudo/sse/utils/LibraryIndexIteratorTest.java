@@ -3,6 +3,7 @@ package org.tudo.sse.utils;
 import org.junit.jupiter.api.*;
 
 import java.net.URI;
+import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -15,7 +16,8 @@ class LibraryIndexIteratorTest {
     @BeforeEach
     void setIndexIterator() {
         try {
-            iteratorUnderTest = new LibraryIndexIterator(new URI("https://repo1.maven.org/maven2/"));
+            iteratorUnderTest = new LibraryIndexIterator(new URI("https://repo1.maven.org/maven2/"),
+                    Paths.get("lastIndexProcessed"), 1000);
         } catch (Exception x) { fail(x); }
     }
 

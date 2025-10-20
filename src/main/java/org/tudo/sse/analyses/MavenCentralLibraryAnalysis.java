@@ -15,9 +15,7 @@ import org.tudo.sse.utils.CLIParser;
 import org.tudo.sse.utils.LibraryIndexIterator;
 import org.tudo.sse.utils.MavenCentralRepository;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
@@ -177,7 +175,8 @@ public abstract class MavenCentralLibraryAnalysis extends ArtifactAnalysis {
             }
         } else {
             try {
-                final LibraryIndexIterator indexIterator = new LibraryIndexIterator(new URI(MavenCentralRepository.RepoBasePath));
+                final LibraryIndexIterator indexIterator = new LibraryIndexIterator(
+                        new URI(MavenCentralRepository.RepoBasePath), config.progressOutputFile, config.progressWriteInterval);
 
                 if(config.progressRestoreFile != null){
                     final long startingPosition = config.getProgressFromRestoreFile();
@@ -279,6 +278,8 @@ public abstract class MavenCentralLibraryAnalysis extends ArtifactAnalysis {
                         case "--coordinates":
                             if(gaInputListFile != null)
                                 throw new CLIException("Input file cannot be set twice!");
+                            if(progressRestoreFile != null)
+                                throw new CLIException("Cannot use custom input list when progress restore file is set!");
                             gaInputListFile = nextArgAsRegularFileReference(args, i);
                             break;
                         case "--name":

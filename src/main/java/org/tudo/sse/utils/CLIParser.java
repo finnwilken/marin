@@ -34,10 +34,10 @@ public abstract class CLIParser {
                     throw(new CLIException(args[i], e.getMessage()));
                 }
             } else {
-                throw(new CLIException(args[i], "Correct format: first:second"));
+                throw(new CLIException("Correct format: first:second", args[i]));
             }
         } else {
-            throw(new CLIException(args[i], "Missing argument: first:second"));
+            throw(new CLIException("Missing argument: first:second", args[i]));
         }
         return toReturn;
     }
@@ -46,7 +46,7 @@ public abstract class CLIParser {
         if(i + 1 < args.length) {
             return Paths.get(args[i + 1]);
         } else {
-            throw(new CLIException(args[i], "Missing argument: path/to/file"));
+            throw(new CLIException("Missing argument: path/to/file", args[i]));
         }
     }
 
@@ -55,7 +55,7 @@ public abstract class CLIParser {
         if(Files.isRegularFile(path))
             return path;
         else
-            throw new CLIException(args[i], "Expected a regular file but got:" + path);
+            throw new CLIException("Expected an existing file but got: " + path, args[i]);
     }
 
     protected Path nextArgAsDirectoryReference(String[] args, int i) throws CLIException {
@@ -63,7 +63,7 @@ public abstract class CLIParser {
         if(Files.isDirectory(path))
             return path;
         else
-            throw new CLIException(args[i], "Expected a directory but got:" + path);
+            throw new CLIException("Expected an existing directory but got: " + path, args[i]);
     }
 
 }
