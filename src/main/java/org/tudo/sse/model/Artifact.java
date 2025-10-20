@@ -32,6 +32,14 @@ public class Artifact {
     private JarInformation jarInformation;
 
     /**
+     * Create a new artifact with no information attached.
+     * @param ident The artifact identifier
+     */
+    public Artifact(ArtifactIdent ident){
+        this.ident = ident;
+    }
+
+    /**
      * Creates a new artifact based on given IndexInformation. This artifact will have no POM or JAR information
      * associated.
      *

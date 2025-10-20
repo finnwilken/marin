@@ -31,6 +31,10 @@ public class ResolverActor extends AbstractActor {
                     message.getInstance().callResolver(message.getIdentifier());
                     message.getInstance().analyzeArtifact(ArtifactFactory.getArtifact(message.getIdentifier()));
                     getSender().tell("Finished", getSelf());
+                })
+                .match(ProcessLibraryMessage.class, message -> {
+                    message.getProcessEntryCallback().get();
+                    getSender().tell("Finished", getSelf());
                 }).build();
     }
 

@@ -18,7 +18,7 @@ public class QueueActor extends AbstractActor {
 
     private final int numResolverActors;
     private final AtomicInteger curNumResolvers;
-    private final Queue<ProcessIdentifierMessage> jobQueue;
+    private final Queue<WorkItem> jobQueue;
     private boolean indexFinished = false;
     private final ActorSystem system;
 
@@ -49,19 +49,8 @@ public class QueueActor extends AbstractActor {
     @Override
     public Receive createReceive() {
         return ReceiveBuilder.create()
-                .match(ProcessIdentifierMessage.class, message -> {
-                    synchronized (curNumResolvers){
-                        if(curNumResolvers.get() < numResolverActors) {
-                            ActorRef processor = getContext().actorOf(ResolverActor.props());
-                            processor.tell(message, getSelf());
-                            log.info("New resolver created");
-                            curNumResolvers.incrementAndGet();
-                        } else {
-                            jobQueue.add(message);
-                        }
-                    }
-
-                })
+                .match(ProcessIdentifierMessage.class, this::forwardToResolvers)
+                .match(ProcessLibraryMessage.class, this::forwardToResolvers)
                 .match(String.class, message -> {
                     synchronized (jobQueue){
                         if(!jobQueue.isEmpty()) {
@@ -90,6 +79,19 @@ public class QueueActor extends AbstractActor {
                     }
                 })
                 .build();
+    }
+
+    private void forwardToResolvers(WorkItem message){
+        synchronized (curNumResolvers){
+            if(curNumResolvers.get() < numResolverActors) {
+                ActorRef processor = getContext().actorOf(ResolverActor.props());
+                processor.tell(message, getSelf());
+                log.info("New resolver created");
+                curNumResolvers.incrementAndGet();
+            } else {
+                jobQueue.add(message);
+            }
+        }
     }
 
 }

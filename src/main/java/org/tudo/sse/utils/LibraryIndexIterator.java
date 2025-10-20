@@ -42,6 +42,17 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
         this.currentLibraryGA = null;
     }
 
+    public void setIndexPosition(long startIdx){
+        Map<String,String> entry;
+
+        do {
+            entry = nextEntry();
+        } while(this.currentPosition < startIdx);
+
+        this.currentLibraryGA = getGAFromEntry(entry);
+        this.currentLibraryIndexPosition = this.currentPosition;
+    }
+
     public boolean hasNext() {
         // If currentLibraryGA is null, we have the first hasNext() call after a call to next(). We must find our new
         // currentLibraryGA first.
@@ -104,8 +115,20 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
     private String getGAFromEntry(Map<String, String> entry){
         final String uVal = entry.get("u");
         if(uVal != null){
-            String[] parts = uVal.split(IndexWalker.splitPattern);
-            return parts[0] + ":" + parts[1];
+            final StringBuilder gaBuilder = new StringBuilder();
+            boolean patternSeen = false;
+            for(char current: uVal.toCharArray()){
+                if(current == '|'){
+                    if(patternSeen) break;
+
+                    patternSeen = true;
+                    gaBuilder.append(':');
+                } else {
+                    gaBuilder.append(current);
+                }
+            }
+
+            return gaBuilder.toString();
         } else return null;
     }
 

@@ -7,7 +7,7 @@ import org.tudo.sse.model.ArtifactIdent;
  * A message passed to the processing queue to indicate that a given analysis instance must process the given
  * artifact identifier.
  */
-public class ProcessIdentifierMessage {
+public class ProcessIdentifierMessage implements WorkItem {
 
     private final ArtifactIdent identifier;
     private final MavenCentralAnalysis instance;
