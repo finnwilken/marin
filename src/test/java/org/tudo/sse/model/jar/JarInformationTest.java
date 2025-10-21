@@ -3,7 +3,7 @@ package org.tudo.sse.model.jar;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.opalj.br.ClassFile;
-import org.opalj.br.ObjectType;
+import org.opalj.br.ClassType;
 import org.opalj.br.analyses.Project;
 import org.tudo.sse.model.ArtifactIdent;
 
@@ -103,7 +103,7 @@ public class JarInformationTest {
     void testOpalProjectSimple(){
         try {
             Project<?> project = jarInfo.getOpalProject();
-            ObjectType afType = project.allProjectClassFiles().find( cf -> cf.thisType().simpleName().equals("ArtifactFactory")).get().thisType();
+            ClassType afType = project.allProjectClassFiles().find( cf -> cf.thisType().simpleName().equals("ArtifactFactory")).get().thisType();
             assertNotNull(afType);
             assertTrue(project.classHierarchy().isKnown(afType));
             assertTrue(project.allLibraryClassFiles().isEmpty());
@@ -123,13 +123,13 @@ public class JarInformationTest {
             Project<?> project = jarInfo.getOpalProject(dependencies, true, true);
 
             // Check that main project is loaded
-            ObjectType afType = project.allProjectClassFiles().find( cf -> cf.thisType().simpleName().equals("ArtifactFactory")).get().thisType();
+            ClassType afType = project.allProjectClassFiles().find( cf -> cf.thisType().simpleName().equals("ArtifactFactory")).get().thisType();
             assertNotNull(afType);
             assertTrue(project.classHierarchy().isKnown(afType));
 
             // Check that libraries are in fact loaded
             assertFalse(project.allLibraryClassFiles().isEmpty());
-            ObjectType irType = project.allLibraryClassFiles().find(cf -> cf.thisType().simpleName().equals("IndexReader")).get().thisType();
+            ClassType irType = project.allLibraryClassFiles().find(cf -> cf.thisType().simpleName().equals("IndexReader")).get().thisType();
             assertNotNull(irType);
             assertTrue(project.classHierarchy().isKnown(irType));
         } catch (Exception x){

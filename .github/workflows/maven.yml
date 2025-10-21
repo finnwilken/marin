@@ -32,3 +32,5 @@ jobs:
       run: mvn -B compile --file pom.xml
     - name: Run unit tests
       run: mvn -B test --file pom.xml
+    - name: Update dependency graph
+      uses: advanced-security/maven-dependency-submission-action@v5

@@ -38,3 +38,4 @@ settings.xml
 #maven resolution files
 maven-resolution-files
 .DS_Store
+.mvn
