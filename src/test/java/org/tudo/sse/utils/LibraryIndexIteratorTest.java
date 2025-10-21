@@ -64,7 +64,7 @@ class LibraryIndexIteratorTest {
     @Test
     @DisplayName("The Library Index Iterator must apply custom starting positions")
     void customStartingPositions() {
-        iteratorUnderTest.setIndexPosition(42000);
+        iteratorUnderTest.setPosition(42000);
 
         int cutoff = 1000;
         int idx = 0;

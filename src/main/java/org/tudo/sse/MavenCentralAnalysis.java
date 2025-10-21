@@ -270,7 +270,7 @@ public abstract class MavenCentralAnalysis {
 
         if(setupInfo.isMulti()) {
             ActorSystem system = ActorSystem.create("my-system");
-            queueActorRef = system.actorOf(QueueActor.props(setupInfo.getThreads(), system), "queueActor");
+            queueActorRef = system.actorOf(QueueActor.props(setupInfo.getThreads(), system, 0,0, null), "queueActor");
 
             if(setupInfo.getToCoordinates() == null) {
                 indexProcessor();

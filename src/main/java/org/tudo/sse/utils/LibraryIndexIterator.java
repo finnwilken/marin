@@ -26,6 +26,7 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
     final long progressSaveInternal;
     private long lastPositionSaved;
     private long currentPosition;
+    private boolean saveProgress;
 
     private String currentLibraryGA;
     private String nextLibraryGA;
@@ -33,6 +34,7 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
     public LibraryIndexIterator(URI baseUri, Path progressOutputFile, long progressSaveInterval) throws IOException {
         this.libraryHashesSeen = new HashSet<>();
 
+        this.saveProgress = true;
         this.progressOutputFilePath = progressOutputFile;
         this.progressSaveInternal = progressSaveInterval;
 
@@ -48,15 +50,18 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
         this.currentLibraryGA = null;
     }
 
-    public void setIndexPosition(long startIdx){
-        Map<String,String> entry;
+    public void setSaveProgress(boolean saveProgress){
+        this.saveProgress = saveProgress;
+    }
 
-        do {
-            entry = nextEntry();
-        } while(this.currentPosition < startIdx);
+    public void setPosition(long startIdx){
+        while(this.currentPosition < startIdx && this.hasNext()){
+            this.next();
+        }
+    }
 
-        this.currentLibraryGA = getGAFromEntry(entry);
-        findNextGA();
+    public long getPosition() {
+        return this.currentPosition;
     }
 
     public boolean hasNext() {
@@ -89,6 +94,10 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
             final String valueToReturn = this.currentLibraryGA;
             this.libraryHashesSeen.add(this.currentLibraryGA.hashCode());
             this.currentLibraryGA = null;
+
+            writeProgressIfNeeded();
+            currentPosition += 1;
+
             return valueToReturn;
         } else throw new IllegalStateException("No libraries left on iterator (position " + currentPosition + ")");
     }
@@ -141,15 +150,14 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
     }
 
     private Map<String, String> nextEntry(){
-        writeProgressIfNeeded();
-        currentPosition += 1;
         return entryIterator.next();
     }
 
     private void writeProgressIfNeeded(){
-        if(this.currentPosition - this.lastPositionSaved >= this.progressSaveInternal){
+        if(this.saveProgress && this.currentPosition - this.lastPositionSaved >= this.progressSaveInternal){
             try(BufferedWriter writer = new BufferedWriter(new FileWriter(this.progressOutputFilePath.toFile()))){
-                writer.write(String.valueOf(currentPosition));
+                // Write position of last GA, as it has now been completed!
+                writer.write(String.valueOf(currentPosition - 1));
             } catch(IOException ignored){}
             this.lastPositionSaved = currentPosition;
         }

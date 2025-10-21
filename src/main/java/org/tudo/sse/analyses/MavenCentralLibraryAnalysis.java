@@ -53,18 +53,18 @@ public abstract class MavenCentralLibraryAnalysis extends ArtifactAnalysis {
 
     @Override
     public final void runAnalysis(String[] args){
+        // Obtain CLI arguments
         this.config.parseArguments(args);
         printRunInfo();
 
         ActorSystem system = null;
 
-        if(this.config.multipleThreads){
-            system = ActorSystem.create("marin-actors");
-            this.queueActorRef = system.actorOf(QueueActor.props(config.threadCount, system), "marin-queue-actor");
-        }
-
+        // Get input iterator - this will either be from a configured input file or from the Maven Central Index. The
+        // iterator will produce strings of form <GroupID>:<ArtifactID>. If a progress restore file is specified, the
+        // progress will be applied to the index iterator automatically.
         Iterator<String> gaIterator = getGaIterator();
 
+        // If there are values to skip, we skip them manually
         if(config.skip > 0){
             log.info("Skipping {} library names", config.skip);
             for(int i = 0; i < config.skip; i++){
@@ -75,18 +75,34 @@ public abstract class MavenCentralLibraryAnalysis extends ArtifactAnalysis {
             }
         }
 
+        // If we want to use multiple threads, we initialize the queue actor that managers workers
+        if(this.config.multipleThreads){
+            // Get the initial progress so the progress output file is up-to-date
+            long initialProgress = gaIterator instanceof LibraryIndexIterator ?
+                    ((LibraryIndexIterator)gaIterator).getPosition() : config.skip;
+            system = ActorSystem.create("marin-actors");
+            this.queueActorRef = system.actorOf(QueueActor.props(config.threadCount, system, initialProgress,
+                    config.progressWriteInterval, config.progressOutputFile), "marin-queue-actor");
+        }
+
         long entriesTaken = 0;
 
         if(config.take >= 0)
             log.info("Taking {} library names", config.take);
 
+        // If specified, we only take the configured amount of entries. If not, we process as long as the iterator
+        // provides new entries
         while((config.take < 0 || entriesTaken < config.take) && gaIterator.hasNext()){
             processEntry(gaIterator.next());
 
             entriesTaken += 1;
         }
 
-        log.info("Processed a total of {} library names", entriesTaken);
+        // At this point all libraries are queued (multithreaded) or processed (single-threaded)
+        if(config.multipleThreads)
+            log.info("Queued a total of {} library names for processing", entriesTaken);
+        else
+            log.info("Processed a total of {} library names", entriesTaken);
 
         // Close index iterator if it was used
         if(gaIterator instanceof LibraryIndexIterator){
@@ -147,8 +163,14 @@ public abstract class MavenCentralLibraryAnalysis extends ArtifactAnalysis {
             libraryArtifacts.add(a);
         }
 
-        // Call the custom analysis implementation
-        analyzeLibrary(ga, libraryArtifacts);
+        try {
+            // Call the custom analysis implementation
+            analyzeLibrary(ga, libraryArtifacts);
+        } catch(Exception x){
+            // Whatever the user-defined code does, we do not want to abort!
+            log.error("Unknown error in analysis implementation", x);
+        }
+
         return null;
     }
 
@@ -181,10 +203,15 @@ public abstract class MavenCentralLibraryAnalysis extends ArtifactAnalysis {
                 final LibraryIndexIterator indexIterator = new LibraryIndexIterator(
                         new URI(MavenCentralRepository.RepoBasePath), config.progressOutputFile, config.progressWriteInterval);
 
+                // If we use multiple threads, the queue actor will store progress. If we use a single thread, the
+                // iterator must store the progress. This is because we want to store progress after the analysis is
+                // actually done, which the iterator cannot know precisely in the multithreaded setting.
+                indexIterator.setSaveProgress(!config.multipleThreads);
+
                 if(config.progressRestoreFile != null){
                     final long startingPosition = config.getProgressFromRestoreFile();
                     log.info("Restoring previous progress (index position {})", startingPosition);
-                    indexIterator.setIndexPosition(startingPosition);
+                    indexIterator.setPosition(startingPosition);
                 }
 
                 return indexIterator;
@@ -254,7 +281,7 @@ public abstract class MavenCentralLibraryAnalysis extends ArtifactAnalysis {
             progressRestoreFile = null;
             multipleThreads = false;
             threadCount = 1;
-            progressWriteInterval = 1000;
+            progressWriteInterval = 100;
         }
 
         @Override
@@ -270,7 +297,7 @@ public abstract class MavenCentralLibraryAnalysis extends ArtifactAnalysis {
                             skip = skipTake[0];
                             take = skipTake[1];
                             break;
-                        case "-ip":
+                        case "--progress-restore-file":
                             if(gaInputListFile != null)
                                 throw new CLIException("Cannot restore index position when a custom input list is used!");
                             if(progressRestoreFile != null)
@@ -278,15 +305,18 @@ public abstract class MavenCentralLibraryAnalysis extends ArtifactAnalysis {
 
                             progressRestoreFile = nextArgAsRegularFileReference(args, i);
                             break;
+                        case "--save-progress-interval":
+                            progressWriteInterval = nextArgAsInt(args, i);
+                            break;
+                        case "--progress-output-file":
+                            progressOutputFile = nextArgAsPath(args, i);
+                            break;
                         case "--coordinates":
                             if(gaInputListFile != null)
                                 throw new CLIException("Input file cannot be set twice!");
                             if(progressRestoreFile != null)
                                 throw new CLIException("Cannot use custom input list when progress restore file is set!");
                             gaInputListFile = nextArgAsRegularFileReference(args, i);
-                            break;
-                        case "--name":
-                            progressOutputFile = nextArgAsPath(args, i);
                             break;
                         case "--multi":
                             final int threads = nextArgAsInt(args, i);

@@ -29,7 +29,7 @@ public class MavenCentralLibraryAnalysisTest {
     @Test
     @DisplayName("The CLI parser must parse common argument values correctly")
     void parseCLIRegular(){
-        final String validArgs = "-st 20:10000 -ip pom.xml --name marin-progress --multi 12";
+        final String validArgs = "-st 20:10000 --progress-restore-file pom.xml --progress-output-file marin-progress --multi 12 --save-progress-interval 20";
         final String[] argsArray = validArgs.split(" ");
 
         emptyAnalysis.config.parseArguments(argsArray);
@@ -40,6 +40,7 @@ public class MavenCentralLibraryAnalysisTest {
         assertEquals(Paths.get("marin-progress"), emptyAnalysis.config.progressOutputFile);
         assertEquals(20, emptyAnalysis.config.skip);
         assertEquals(10000, emptyAnalysis.config.take);
+        assertEquals(20, emptyAnalysis.config.progressWriteInterval);
         assertNull(emptyAnalysis.config.gaInputListFile);
     }
 
@@ -54,13 +55,14 @@ public class MavenCentralLibraryAnalysisTest {
         assertEquals(Paths.get("marin-progress"), emptyAnalysis.config.progressOutputFile);
         assertEquals(-1, emptyAnalysis.config.skip);
         assertEquals(-1, emptyAnalysis.config.take);
+        assertEquals(100, emptyAnalysis.config.progressWriteInterval);
         assertNull(emptyAnalysis.config.gaInputListFile);
     }
 
     @Test
     @DisplayName("The CLI parser must fail if input files do not exist")
     void parseNonExistingFile(){
-        final String validArgs = "-ip foo.input";
+        final String validArgs = "--progress-restore-file foo.input";
         final String[] argsArray = validArgs.split(" ");
 
         assertThrows(RuntimeException.class, () -> emptyAnalysis.config.parseArguments(argsArray));
@@ -81,7 +83,7 @@ public class MavenCentralLibraryAnalysisTest {
     @Test
     @DisplayName("The CLI parser must not accept setting an index position on a custom GA input list")
     void parseNonExistingIndex(){
-        final String validArgs = "-ip pom.xml --coordinates pom.xml";
+        final String validArgs = "--progress-restore-file pom.xml --coordinates pom.xml";
         final String[] argsArray = validArgs.split(" ");
 
         assertThrows(RuntimeException.class, () -> emptyAnalysis.config.parseArguments(argsArray));
@@ -142,7 +144,7 @@ public class MavenCentralLibraryAnalysisTest {
 
     @Test
     @DisplayName("An analysis with POM requirements must produce POM information instances")
-    void simpleIndexWithPomAnalysis(){
+    void simpleIndexWithPomAnalysis() throws IOException{
 
         final List<String> librariesHit = new java.util.ArrayList<>();
 
@@ -157,7 +159,7 @@ public class MavenCentralLibraryAnalysisTest {
             }
         };
 
-        final String args = "-st 5000:10";
+        final String args = "-st 5000:10 --save-progress-interval 5";
         final String[] argsArray = args.split(" ");
 
         analysis.runAnalysis(argsArray);
@@ -165,11 +167,15 @@ public class MavenCentralLibraryAnalysisTest {
         assertEquals(10, librariesHit.size());
         assertFalse(librariesHit.contains("yom:yom"));
         assertFalse(librariesHit.contains("yan:yan"));
+
+        long progress = Long.parseLong(Files.readString(analysis.config.progressOutputFile));
+
+        assert((progress - 5000) < analysis.config.progressWriteInterval);
     }
 
     @Test
     @DisplayName("An analysis with multithreading must not miss any libraries")
-    void parallelIndexAnalysis(){
+    void parallelIndexAnalysis() throws IOException{
 
         final AtomicInteger count = new AtomicInteger(0);
 
@@ -184,12 +190,17 @@ public class MavenCentralLibraryAnalysisTest {
             }
         };
 
-        final String args = "-st 5000:100 --multi 8";
+        final String args = "-st 5000:500 --multi 8";
         final String[] argsArray = args.split(" ");
 
         analysis.runAnalysis(argsArray);
 
-        assertEquals(100, count.get());
+        assertEquals(500, count.get());
+
+        long progress = Long.parseLong(Files.readString(analysis.config.progressOutputFile));
+
+        // Skip values must be part of the progress! Last progress write must have been somewhere after 5400 (interval 100)
+        assert(progress >= 5400);
     }
 
     @Test
@@ -298,7 +309,7 @@ public class MavenCentralLibraryAnalysisTest {
             }
         };
 
-        final String args = "-st 0:5 -ip " + restoreFile.toAbsolutePath();
+        final String args = "-st 0:5 --progress-restore-file " + restoreFile.toAbsolutePath();
         final String[] argsArray = args.split(" ");
 
         analysis.runAnalysis(argsArray);
