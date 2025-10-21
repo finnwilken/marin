@@ -72,7 +72,7 @@ public class QueueActor extends AbstractActor {
                     }
 
                 })
-                .match(IndexProcessingMessage.class, indexProcessingMessage -> {
+                .match(WorkloadIsFinalMessage.class, workloadIsFinalMessage -> {
                     indexFinished = true;
                     if(curNumResolvers.get() == 0) {
                         system.terminate();

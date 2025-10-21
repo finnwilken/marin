@@ -23,7 +23,7 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
 
     private final Path progressOutputFilePath;
 
-    final long progressSaveInteral;
+    final long progressSaveInternal;
     private long lastPositionSaved;
     private long currentPosition;
 
@@ -34,7 +34,7 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
         this.libraryHashesSeen = new HashSet<>();
 
         this.progressOutputFilePath = progressOutputFile;
-        this.progressSaveInteral = progressSaveInterval;
+        this.progressSaveInternal = progressSaveInterval;
 
         // Build intermediate readers that must be kept open until iterator is done and resources can be closed
         this.mavenIndexReader = new IndexReader(null, new HttpResourceHandler(baseUri.resolve(".index/")));
@@ -56,6 +56,7 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
         } while(this.currentPosition < startIdx);
 
         this.currentLibraryGA = getGAFromEntry(entry);
+        findNextGA();
     }
 
     public boolean hasNext() {
@@ -77,23 +78,7 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
                 this.nextLibraryGA = null;
             }
 
-            // Walk up to the next entry that has a different GA (is a different library)
-            String nextNewGA = null;
-
-            while(entryIterator.hasNext()){
-                final Map<String, String> nextEntry = nextEntry();
-                final String nextGA =  getGAFromEntry(nextEntry);
-
-                // Silently ignore malformed entries
-                if(nextGA == null) continue;
-
-                if(!currentLibraryGA.equals(nextGA) && isNewLibrary(nextGA)){
-                    nextNewGA = nextGA;
-                    break;
-                }
-            }
-
-            this.nextLibraryGA = nextNewGA;
+            findNextGA();
         }
 
         return this.nextLibraryGA != null;
@@ -135,6 +120,26 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
         } else return null;
     }
 
+    private void findNextGA(){
+        // Walk up to the next entry that has a different GA (is a different library)
+        String nextNewGA = null;
+
+        while(entryIterator.hasNext()){
+            final Map<String, String> nextEntry = nextEntry();
+            final String nextGA =  getGAFromEntry(nextEntry);
+
+            // Silently ignore malformed entries
+            if(nextGA == null) continue;
+
+            if(!currentLibraryGA.equals(nextGA) && isNewLibrary(nextGA)){
+                nextNewGA = nextGA;
+                break;
+            }
+        }
+
+        this.nextLibraryGA = nextNewGA;
+    }
+
     private Map<String, String> nextEntry(){
         writeProgressIfNeeded();
         currentPosition += 1;
@@ -142,7 +147,7 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
     }
 
     private void writeProgressIfNeeded(){
-        if(this.currentPosition - this.lastPositionSaved >= this.progressSaveInteral){
+        if(this.currentPosition - this.lastPositionSaved >= this.progressSaveInternal){
             try(BufferedWriter writer = new BufferedWriter(new FileWriter(this.progressOutputFilePath.toFile()))){
                 writer.write(String.valueOf(currentPosition));
             } catch(IOException ignored){}

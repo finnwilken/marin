@@ -1,12 +1,18 @@
 package org.tudo.sse.analyses;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.tudo.sse.ArtifactFactory;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.utils.MavenCentralAnalysisFactory;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -14,6 +20,11 @@ public class MavenCentralLibraryAnalysisTest {
 
     final MavenCentralLibraryAnalysis emptyAnalysis =
             MavenCentralAnalysisFactory.buildEmptyLibraryAnalysisWithNoRequirements();
+
+    @AfterEach
+    public void cleanup(){
+        ArtifactFactory.artifacts.clear();
+    }
 
     @Test
     @DisplayName("The CLI parser must parse common argument values correctly")
@@ -77,9 +88,10 @@ public class MavenCentralLibraryAnalysisTest {
     }
 
     @Test
+    @DisplayName("An analysis with no requirements must not produce information instances")
     void simpleIndexAnalysis(){
 
-        final List<String> librariesHit = new java.util.ArrayList<>(List.of());
+        final List<String> librariesHit = new java.util.ArrayList<>();
 
         final MavenCentralLibraryAnalysis analysis = new MavenCentralLibraryAnalysis(false, false, false) {
             @Override
@@ -88,7 +100,6 @@ public class MavenCentralLibraryAnalysisTest {
                 assertNull(releases.get(0).getIndexInformation());
                 assertNull(releases.get(0).getPomInformation());
                 assertNull(releases.get(0).getJarInformation());
-                System.out.println(libraryGA);
                 librariesHit.add(libraryGA);
             }
         };
@@ -100,7 +111,210 @@ public class MavenCentralLibraryAnalysisTest {
 
         assertEquals(3, librariesHit.size());
         assert(librariesHit.contains("yom:yom"));
+    }
 
+    @Test
+    @DisplayName("An analysis with JAR requirements must produce JAR information instances")
+    void simpleIndexWithJarAnalysis(){
+
+        final List<String> librariesHit = new java.util.ArrayList<>();
+
+        final MavenCentralLibraryAnalysis analysis = new MavenCentralLibraryAnalysis(false, false, true) {
+            @Override
+            protected void analyzeLibrary(String libraryGA, List<Artifact> releases) {
+                assertFalse(releases.isEmpty());
+                assertNull(releases.get(0).getIndexInformation());
+                assertNull(releases.get(0).getPomInformation());
+                assertNotNull(releases.get(0).getJarInformation());
+                librariesHit.add(libraryGA);
+            }
+        };
+
+        final String args = "-st 3:3";
+        final String[] argsArray = args.split(" ");
+
+        analysis.runAnalysis(argsArray);
+
+        assertEquals(3, librariesHit.size());
+        assertFalse(librariesHit.contains("yom:yom"));
+        assert(librariesHit.contains("yan:yan"));
+    }
+
+    @Test
+    @DisplayName("An analysis with POM requirements must produce POM information instances")
+    void simpleIndexWithPomAnalysis(){
+
+        final List<String> librariesHit = new java.util.ArrayList<>();
+
+        final MavenCentralLibraryAnalysis analysis = new MavenCentralLibraryAnalysis(true, true, false) {
+            @Override
+            protected void analyzeLibrary(String libraryGA, List<Artifact> releases) {
+                assertFalse(releases.isEmpty());
+                assertNull(releases.get(0).getIndexInformation());
+                assertNotNull(releases.get(0).getPomInformation());
+                assertNull(releases.get(0).getJarInformation());
+                librariesHit.add(libraryGA);
+            }
+        };
+
+        final String args = "-st 5000:10";
+        final String[] argsArray = args.split(" ");
+
+        analysis.runAnalysis(argsArray);
+
+        assertEquals(10, librariesHit.size());
+        assertFalse(librariesHit.contains("yom:yom"));
+        assertFalse(librariesHit.contains("yan:yan"));
+    }
+
+    @Test
+    @DisplayName("An analysis with multithreading must not miss any libraries")
+    void parallelIndexAnalysis(){
+
+        final AtomicInteger count = new AtomicInteger(0);
+
+        final MavenCentralLibraryAnalysis analysis = new MavenCentralLibraryAnalysis(false, false, false) {
+            @Override
+            protected void analyzeLibrary(String libraryGA, List<Artifact> releases) {
+                assertFalse(releases.isEmpty());
+                assertNull(releases.get(0).getIndexInformation());
+                assertNull(releases.get(0).getPomInformation());
+                assertNull(releases.get(0).getJarInformation());
+                count.incrementAndGet();
+            }
+        };
+
+        final String args = "-st 5000:100 --multi 8";
+        final String[] argsArray = args.split(" ");
+
+        analysis.runAnalysis(argsArray);
+
+        assertEquals(100, count.get());
+    }
+
+    @Test
+    @DisplayName("An analysis with input file must not miss any libraries")
+    void analysisFromFile() throws IOException {
+
+        final Path validLibraryInput = testResource("library-names-valid.txt");
+
+        assertNotNull(validLibraryInput);
+        assert(Files.exists(validLibraryInput));
+
+        final List<String> expectedLibraries = Files.readAllLines(validLibraryInput);
+
+        final List<String> librariesHit = new java.util.ArrayList<>();
+
+        final MavenCentralLibraryAnalysis analysis = new MavenCentralLibraryAnalysis(false, false, false) {
+            @Override
+            protected void analyzeLibrary(String libraryGA, List<Artifact> releases) {
+                assertFalse(releases.isEmpty());
+                assertNull(releases.get(0).getIndexInformation());
+                assertNull(releases.get(0).getPomInformation());
+                assertNull(releases.get(0).getJarInformation());
+                librariesHit.add(libraryGA);
+            }
+        };
+
+        final String args = "--coordinates " + validLibraryInput.toAbsolutePath();
+        final String[] argsArray = args.split(" ");
+
+        analysis.runAnalysis(argsArray);
+
+        assertEquals(expectedLibraries, librariesHit);
+    }
+
+    @Test
+    @DisplayName("An analysis with input file must allow pagination")
+    void analysisFromFileWithPagination() throws IOException {
+
+        final Path validLibraryInput = testResource("library-names-valid.txt");
+
+        assertNotNull(validLibraryInput);
+        assert(Files.exists(validLibraryInput));
+
+        final List<String> expectedLibraries = Files.readAllLines(validLibraryInput);
+
+        final List<String> librariesHit = new java.util.ArrayList<>();
+
+        final MavenCentralLibraryAnalysis analysis = new MavenCentralLibraryAnalysis(false, false, false) {
+            @Override
+            protected void analyzeLibrary(String libraryGA, List<Artifact> releases) {
+                assertFalse(releases.isEmpty());
+                assertNull(releases.get(0).getIndexInformation());
+                assertNull(releases.get(0).getPomInformation());
+                assertNull(releases.get(0).getJarInformation());
+                librariesHit.add(libraryGA);
+            }
+        };
+
+        final String args = "-st 1:2 --coordinates " + validLibraryInput.toAbsolutePath();
+        final String[] argsArray = args.split(" ");
+
+        analysis.runAnalysis(argsArray);
+
+        assertEquals(2, librariesHit.size());
+        assert(librariesHit.contains(expectedLibraries.get(1)));
+        assert(librariesHit.contains(expectedLibraries.get(2)));
+    }
+
+    @Test
+    @DisplayName("An analysis with input file must not fail on invalid inputs")
+    void analysisFromInvalidFile() throws IOException {
+
+        final Path validLibraryInput = testResource("library-names-invalid.txt");
+
+        assertNotNull(validLibraryInput);
+        assert (Files.exists(validLibraryInput));
+
+        final MavenCentralLibraryAnalysis analysis = new MavenCentralLibraryAnalysis(false, false, false) {
+            @Override
+            protected void analyzeLibrary(String libraryGA, List<Artifact> releases) {
+                fail("Analysis should not be executed on invalid input: " + libraryGA);
+            }
+        };
+
+        final String args = "--coordinates " + validLibraryInput.toAbsolutePath();
+        final String[] argsArray = args.split(" ");
+
+        analysis.runAnalysis(argsArray);
+    }
+
+    @Test
+    @DisplayName("An analysis must apply pagination on top of progress restore values")
+    void analysisWithRestoreAndPagination() throws IOException {
+
+        final Path restoreFile = testResource("testingIndexPosition.txt");
+
+        assertNotNull(restoreFile);
+        assert (Files.exists(restoreFile));
+
+        final List<String> librariesHit = new java.util.ArrayList<>();
+
+        final MavenCentralLibraryAnalysis analysis = new MavenCentralLibraryAnalysis(false, false, false) {
+            @Override
+            protected void analyzeLibrary(String libraryGA, List<Artifact> releases) {
+                librariesHit.add(libraryGA);
+            }
+        };
+
+        final String args = "-st 0:5 -ip " + restoreFile.toAbsolutePath();
+        final String[] argsArray = args.split(" ");
+
+        analysis.runAnalysis(argsArray);
+
+        // When restoring progress - even though we do not skip anything - we do not want to see the first index entry!
+        assertEquals(5, librariesHit.size());
+        assertFalse(librariesHit.contains("yom:yom"));
+    }
+
+    private Path testResource(String pathToResource){
+        try {
+            return Path.of(getClass().getClassLoader().getResource(pathToResource).toURI());
+        } catch (Exception x){
+            fail("Test setup: Failed to load resource file " + pathToResource, x);
+        }
+        return null;
     }
 
 }

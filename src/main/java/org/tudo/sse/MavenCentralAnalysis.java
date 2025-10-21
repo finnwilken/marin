@@ -8,7 +8,7 @@ import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.index.IndexInformation;
 import org.tudo.sse.multithreading.ProcessIdentifierMessage;
-import org.tudo.sse.multithreading.IndexProcessingMessage;
+import org.tudo.sse.multithreading.WorkloadIsFinalMessage;
 import org.tudo.sse.resolution.ResolverFactory;
 import org.tudo.sse.utils.IndexIterator;
 import org.tudo.sse.multithreading.QueueActor;
@@ -369,7 +369,7 @@ public abstract class MavenCentralAnalysis {
         }
 
         if(setupInfo.isMulti()) {
-            queueActorRef.tell(new IndexProcessingMessage("Finished"), ActorRef.noSender());
+            queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
         }
 
         indexIterator.closeReader();
@@ -405,7 +405,7 @@ public abstract class MavenCentralAnalysis {
         }
 
         if(setupInfo.isMulti()) {
-            queueActorRef.tell(new IndexProcessingMessage("Finished"), ActorRef.noSender());
+            queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
         }
 
         indexIterator.closeReader();
@@ -447,7 +447,7 @@ public abstract class MavenCentralAnalysis {
         }
 
         if(setupInfo.isMulti()) {
-            queueActorRef.tell(new IndexProcessingMessage("Finished"), ActorRef.noSender());
+            queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
         }
 
         indexIterator.closeReader();
@@ -489,7 +489,7 @@ public abstract class MavenCentralAnalysis {
         }
 
         if(setupInfo.isMulti()) {
-            queueActorRef.tell(new IndexProcessingMessage("Finished"), ActorRef.noSender());
+            queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
         }
 
         indexIterator.closeReader();
@@ -523,7 +523,7 @@ public abstract class MavenCentralAnalysis {
         }
 
         if(setupInfo.isMulti()) {
-            queueActorRef.tell(new IndexProcessingMessage("Finished"), ActorRef.noSender());
+            queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
         }
         indexIterator.closeReader();
         return idents;
@@ -563,7 +563,7 @@ public abstract class MavenCentralAnalysis {
         }
 
         if(setupInfo.isMulti()) {
-            queueActorRef.tell(new IndexProcessingMessage("Finished"), ActorRef.noSender());
+            queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
         }
 
         indexIterator.closeReader();
@@ -645,7 +645,7 @@ public abstract class MavenCentralAnalysis {
             }
 
             if(setupInfo.isMulti()) {
-                queueActorRef.tell(new IndexProcessingMessage("Finished"), ActorRef.noSender());
+                queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
             }
 
             writeLastProcessed(i, setupInfo.getName());

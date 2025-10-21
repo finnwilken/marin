@@ -6,6 +6,7 @@ import org.tudo.sse.ArtifactFactory;
 import org.tudo.sse.CLIException;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
+import org.tudo.sse.multithreading.WorkloadIsFinalMessage;
 import org.tudo.sse.multithreading.ProcessLibraryMessage;
 import org.tudo.sse.multithreading.QueueActor;
 import org.tudo.sse.resolution.ResolverFactory;
@@ -79,7 +80,7 @@ public abstract class MavenCentralLibraryAnalysis extends ArtifactAnalysis {
         if(config.take >= 0)
             log.info("Taking {} library names", config.take);
 
-        while(entriesTaken < config.take && gaIterator.hasNext()){
+        while((config.take < 0 || entriesTaken < config.take) && gaIterator.hasNext()){
             processEntry(gaIterator.next());
 
             entriesTaken += 1;
@@ -97,7 +98,9 @@ public abstract class MavenCentralLibraryAnalysis extends ArtifactAnalysis {
 
         // Close actor system if it was used
         if(system != null){
-            try{
+            try {
+                // Tell the queue that no more work items will follow
+                this.queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
                 system.getWhenTerminated().toCompletableFuture().get();
             } catch (Exception x) { log.warn("Error closing actor system: {}", x.getMessage());}
         }
