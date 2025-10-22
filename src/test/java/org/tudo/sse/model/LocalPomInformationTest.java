@@ -44,15 +44,17 @@ class LocalPomInformationTest {
         }
 
         @Override
-        public List<String> getReleases(ArtifactIdent identifier) throws IOException {
+        public List<String> getReleases(String groupId, String artifactId) throws IOException {
             if(releaseListData.isEmpty()){
                 buildMap();
             }
 
-            if(releaseListData.containsKey(identifier.getGA())){
-                return releaseListData.get(identifier.getGA());
+            final String ga = groupId + ":" + artifactId;
+
+            if(releaseListData.containsKey(ga)){
+                return releaseListData.get(ga);
             } else {
-                fail("No mock release data available for " + identifier.getGA());
+                fail("No mock release data available for " + ga);
                 return null;
             }
         }

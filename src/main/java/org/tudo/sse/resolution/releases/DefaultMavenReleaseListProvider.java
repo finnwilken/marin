@@ -12,6 +12,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -23,7 +24,7 @@ import java.util.Objects;
  *
  * @author Johannes Düsing
  */
-public class DefaultMavenReleaseListProvider implements IReleaseListProvider{
+public class DefaultMavenReleaseListProvider extends IReleaseListProvider{
 
     private final MetadataXpp3Reader reader = new MetadataXpp3Reader();
     private final MavenCentralRepository mavenRepo = MavenCentralRepository.getInstance();
@@ -43,10 +44,8 @@ public class DefaultMavenReleaseListProvider implements IReleaseListProvider{
     private DefaultMavenReleaseListProvider(){}
 
     @Override
-    public List<String> getReleases(ArtifactIdent identifier) throws IOException {
-        Objects.requireNonNull(identifier);
-
-        try(InputStream xmlInputStream = mavenRepo.openXMLFileInputStream(identifier)) {
+    public List<String> getReleases(String groupId, String artifactId) throws IOException {
+        try(InputStream xmlInputStream = mavenRepo.openXMLFileInputStream(groupId, artifactId)) {
             Metadata versionListData = reader.read(new BufferedReader(new InputStreamReader(xmlInputStream)));
 
             Versioning versioning = versionListData.getVersioning();
@@ -61,8 +60,8 @@ public class DefaultMavenReleaseListProvider implements IReleaseListProvider{
                 return List.of();
             }
 
-        } catch (XmlPullParserException | IOException | FileNotFoundException x) {
-            throw new IOException("Failed to obtain version list for " + identifier, x);
+        } catch (XmlPullParserException | IOException | FileNotFoundException | URISyntaxException x) {
+            throw new IOException("Failed to obtain version list for " + groupId + ":" + artifactId, x);
         }
     }
 

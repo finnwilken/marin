@@ -21,6 +21,22 @@ public final class ArtifactFactory {
     public static final Map<ArtifactIdent, Artifact> artifacts = new HashMap<>();
 
     /**
+     * Creates a new artifact or retrieves an existing one. If a new artifact is created, no information is attached.
+     * @param ident The artifact identifier
+     * @return The artifact with the given identifier
+     */
+    public static Artifact createArtifact(ArtifactIdent ident) {
+        assert(ident != null);
+        if(artifacts.containsKey(ident)) {
+            return artifacts.get(ident);
+        } else {
+            Artifact newArtifact = new Artifact(ident);
+            artifacts.put(ident, newArtifact);
+            return newArtifact;
+        }
+    }
+
+    /**
      * This method creates a new Artifact or retrieves it from the map.
      * @param artifactInformation an identifier used to keep track of artifacts
      * @return a newly created or retrieved artifact
