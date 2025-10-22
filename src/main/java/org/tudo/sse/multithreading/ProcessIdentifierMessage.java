@@ -1,6 +1,6 @@
 package org.tudo.sse.multithreading;
 
-import org.tudo.sse.MavenCentralAnalysis;
+import org.tudo.sse.analyses.MavenCentralArtifactAnalysis;
 import org.tudo.sse.model.ArtifactIdent;
 
 /**
@@ -10,14 +10,14 @@ import org.tudo.sse.model.ArtifactIdent;
 public class ProcessIdentifierMessage implements WorkItem {
 
     private final ArtifactIdent identifier;
-    private final MavenCentralAnalysis instance;
+    private final MavenCentralArtifactAnalysis instance;
 
     /**
      * Creates a new message with the given artifact identifier and analysis instance.
      * @param identifier The artifact identifier that must be processed
      * @param instance The analysis instance that must process the identifier
      */
-    public ProcessIdentifierMessage(ArtifactIdent identifier, MavenCentralAnalysis instance) {
+    public ProcessIdentifierMessage(ArtifactIdent identifier, MavenCentralArtifactAnalysis instance) {
         this.identifier = identifier;
         this.instance = instance;
     }
@@ -34,7 +34,7 @@ public class ProcessIdentifierMessage implements WorkItem {
      * Retrieves the analysis instance that must process the identifier
      * @return The analysis instance
      */
-    public MavenCentralAnalysis getInstance() {
+    public MavenCentralArtifactAnalysis getInstance() {
         return instance;
     }
 }

@@ -3,7 +3,7 @@ package org.tudo.sse.analyses;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-abstract class ArtifactAnalysis {
+abstract class MavenCentralAnalysis {
 
     /**
      * Defines whether this analysis requires artifacts to have index information annotated.
@@ -40,10 +40,10 @@ abstract class ArtifactAnalysis {
      *                            be set to true no matter its given parameter value.
      * @param requiresJar Whether this analysis requires JAR information
      */
-    protected ArtifactAnalysis(boolean requiresIndex,
-                               boolean requiresPom,
-                               boolean requiresTransitives,
-                               boolean requiresJar){
+    protected MavenCentralAnalysis(boolean requiresIndex,
+                                   boolean requiresPom,
+                                   boolean requiresTransitives,
+                                   boolean requiresJar){
         if(!requiresIndex && !requiresPom && !requiresTransitives && !requiresJar){
             log.warn("Potential misconfiguration - no data sources (index, POM, JAR) are required by this analysis");
         } else if(requiresTransitives && !requiresPom){

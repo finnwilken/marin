@@ -16,8 +16,7 @@ class LibraryIndexIteratorTest {
     @BeforeEach
     void setIndexIterator() {
         try {
-            iteratorUnderTest = new LibraryIndexIterator(new URI("https://repo1.maven.org/maven2/"),
-                    Paths.get("lastIndexProcessed"), 1000);
+            iteratorUnderTest = new LibraryIndexIterator(new URI("https://repo1.maven.org/maven2/"));
         } catch (Exception x) { fail(x); }
     }
 

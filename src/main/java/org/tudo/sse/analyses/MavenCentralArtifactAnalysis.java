@@ -1,15 +1,18 @@
-package org.tudo.sse;
+package org.tudo.sse.analyses;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.tudo.sse.ArtifactFactory;
+import org.tudo.sse.CLIException;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.index.IndexInformation;
 import org.tudo.sse.multithreading.ProcessIdentifierMessage;
 import org.tudo.sse.multithreading.WorkloadIsFinalMessage;
 import org.tudo.sse.resolution.ResolverFactory;
+import org.tudo.sse.utils.ArtifactConfigParser;
 import org.tudo.sse.utils.IndexIterator;
 import org.tudo.sse.multithreading.QueueActor;
 
@@ -18,7 +21,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -27,9 +29,9 @@ import java.util.Map;
  * The MavenCentralAnalysis enables analysis of artifacts on the maven central repository for jobs of any size.
  * Takes in cli to be configured to the specific job desired.
  */
-public abstract class MavenCentralAnalysis {
+public abstract class MavenCentralArtifactAnalysis {
 
-    private final CliInformation setupInfo;
+    private ArtifactConfigParser.ArtifactConfig artifactConfig;
     private ActorRef queueActorRef;
     private ResolverFactory resolverFactory;
 
@@ -54,7 +56,7 @@ public abstract class MavenCentralAnalysis {
     protected final boolean resolveJar;
 
 
-    private static final Logger log = LogManager.getLogger(MavenCentralAnalysis.class);
+    private static final Logger log = LogManager.getLogger(MavenCentralArtifactAnalysis.class);
 
     /**
      * Creates a new Maven Central Analysis with the given configuration options.
@@ -65,10 +67,10 @@ public abstract class MavenCentralAnalysis {
      *                            be set to true no matter its given parameter value.
      * @param requiresJar Whether this analysis requires JAR information
      */
-    protected MavenCentralAnalysis(boolean requiresIndex,
-                                   boolean requiresPom,
-                                   boolean requiresTransitives,
-                                   boolean requiresJar)  {
+    protected MavenCentralArtifactAnalysis(boolean requiresIndex,
+                                           boolean requiresPom,
+                                           boolean requiresTransitives,
+                                           boolean requiresJar)  {
 
         if(!requiresIndex && !requiresPom && !requiresTransitives && !requiresJar){
             log.warn("Potential misconfiguration - no data sources (index, POM, JAR) are required by this analysis");
@@ -76,12 +78,12 @@ public abstract class MavenCentralAnalysis {
             log.warn("Potential misconfiguration - analysis requires transitive information but no POM information. " +
                     "POM information will also be collected to provide transitive information.");
         }
-
-        setupInfo = new CliInformation();
         resolveIndex = requiresIndex;
         resolvePom = requiresPom || requiresTransitives; // Cannot have transitive information without POM information
         processTransitives = requiresTransitives;
         resolveJar = requiresJar;
+        // Initialize with default config, update later
+        artifactConfig = new ArtifactConfigParser.ArtifactConfig();
     }
 
 
@@ -93,73 +95,11 @@ public abstract class MavenCentralAnalysis {
     public abstract void analyzeArtifact(Artifact current);
 
     /**
-     * This method handles parsing the command line arguments and stores it into a CliInformation object.
-     *
-     * @param args - cli to be parsed
-     * @see CliInformation when there is an issue processing the cli passed to the program
-     */
-    public void parseCmdLine(String[] args) {
-        boolean flagSet1 = false;
-        boolean flagSet2 = false;
-        boolean flagSet3 = false;
-        try {
-            for (int i = 0; i < args.length; i += 2) {
-                switch (args[i]) {
-                    case "-st":
-                        checkConflict(flagSet1, args[i]);
-                        long[] parsed = parseLong(args, i);
-                        setupInfo.setSkip(parsed[0]);
-                        setupInfo.setTake(parsed[1]);
-                        flagSet1 = true;
-                        break;
-                    case "-su":
-                        checkTwoConflicts(flagSet1, flagSet2, args[i]);
-                        long[] parsed1 = parseLong(args, i);
-                        setupInfo.setSince(parsed1[0]);
-                        setupInfo.setUntil(parsed1[1]);
-                        flagSet1 = true;
-                        flagSet2 = true;
-                        break;
-                    case "-ip":
-                        checkConflict(flagSet1, args[i]);
-                        setupInfo.setToIndexPos(parsePathName(args, i));
-                        flagSet1 = true;
-                        break;
-                    case "--coordinates":
-                        checkConflict(flagSet2, args[i]);
-                        checkConflict(flagSet3, args[i]);
-                        setupInfo.setToCoordinates(parsePathName(args, i));
-                        flagSet2 = true;
-                        flagSet3 = true;
-                        break;
-                    case "--name":
-                        if(i + 1 < args.length) {
-                            setupInfo.setName(parsePathName(args, i));
-                        }
-                        break;
-                    case "--multi":
-                        setupInfo.setMulti(true);
-                        setupInfo.setThreads(parseInt(args, i));
-                        break;
-                    case "--output":
-                        setupInfo.setOutput(true);
-                        setupInfo.setToOutputDirectory(parsePathName(args, i));
-                        break;
-                    default:
-                        throw new CLIException(args[i]);
-                }
-            }
-        } catch(CLIException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
      * Returns the CLI configuration for this analysis.
      * @return CLI information for this analysis
      */
-    public CliInformation getSetupInfo() {
-        return setupInfo;
+    public ArtifactConfigParser.ArtifactConfig getSetupInfo() {
+        return this.artifactConfig;
     }
 
     private void printRunInfo(){
@@ -171,81 +111,23 @@ public abstract class MavenCentralAnalysis {
 
         log.info("The current run has been configured as follows:");
 
-        if(setupInfo.isMulti()){
-            log.info("\t - Using " + setupInfo.getThreads() + " threads");
+        if(this.artifactConfig.multipleThreads){
+            log.info("\t - Using " + this.artifactConfig.threadCount + " threads");
         } else {
             log.info("\t - Using one thread");
         }
 
-        if(setupInfo.getToCoordinates() == null){
+        if(this.artifactConfig.inputListFile == null){
             log.info("\t - Reading artifacts from Maven Central index");
-            if(setupInfo.getToIndexPos() != null) log.info("\t - Restoring last index position from " + setupInfo.getToIndexPos());
-            if(setupInfo.getName() != null)       log.info("\t - Writing last index position to " + setupInfo.getName());
-            if(setupInfo.getSkip() >= 0)          log.info("\t - Skipping " + setupInfo.getSkip() + " artifacts");
-            if(setupInfo.getTake() >= 0)          log.info("\t - Taking " + setupInfo.getTake() + " artifacts");
-            if(setupInfo.getSince() >= 0)         log.info("\t - Skipping artifacts before " + setupInfo.getSince());
-            if(setupInfo.getUntil() >= 0)         log.info("\t - Taking artifacts until " + setupInfo.getUntil());
+            if(this.artifactConfig.progressRestoreFile != null) log.info("\t - Restoring last index position from " + this.artifactConfig.progressRestoreFile);
+            if(this.artifactConfig.progressOutputFile != null)       log.info("\t - Writing last index position to " + this.artifactConfig.progressOutputFile);
+            if(this.artifactConfig.skip >= 0)          log.info("\t - Skipping " + this.artifactConfig.skip + " artifacts");
+            if(this.artifactConfig.take >= 0)          log.info("\t - Taking " + this.artifactConfig.take + " artifacts");
+            if(this.artifactConfig.since >= 0)         log.info("\t - Skipping artifacts before " + this.artifactConfig.since);
+            if(this.artifactConfig.until >= 0)         log.info("\t - Taking artifacts until " + this.artifactConfig.until);
 
         } else {
-            log.info("\t - Reading artifacts from GAV-list at " + setupInfo.getToCoordinates());
-        }
-    }
-
-    private void checkTwoConflicts(boolean checkConflict1, boolean checkConflict2, String flag) throws CLIException {
-        if(checkConflict1 || checkConflict2) {
-            throw new CLIException("Other flag already set.", flag);
-        }
-    }
-
-    private void checkConflict(boolean checkConflict, String flag) throws CLIException {
-        if(checkConflict) {
-            throw new CLIException("Other flag already set.", flag);
-        }
-    }
-
-    private long[] parseLong(String[] args, int i) throws CLIException {
-        long[] toReturn = new long[2];
-        if(i + 1 < args.length) {
-            String[] ints = args[i + 1].split(":");
-            if(ints.length == 2) {
-                try {
-                    toReturn[0] = Long.parseLong(ints[0]);
-                    toReturn[1] = Long.parseLong(ints[1]);
-                } catch(NumberFormatException e) {
-                    throw(new CLIException(args[i], e.getMessage()));
-                }
-            } else {
-                throw(new CLIException(args[i], "Correct format: first:second"));
-            }
-        } else {
-            throw(new CLIException(args[i], "Missing argument: first:second"));
-        }
-        return toReturn;
-    }
-
-    private int parseInt(String[] args, int i) throws CLIException {
-        if(i + 1 < args.length) {
-            try{
-                return Integer.parseInt(args[i + 1]);
-            } catch(NumberFormatException e) {
-                throw new CLIException(args[i], e.getMessage());
-            }
-        } else {
-            throw new CLIException(args[i]);
-        }
-    }
-
-    private Path parsePathName(String[] args, int i) throws CLIException {
-        if(i + 1 < args.length) {
-            if(Files.isRegularFile(Paths.get(args[i + 1])) || args[i].equals("--name")) {
-                return Paths.get(args[i + 1]);
-            } else if(args[i].equals("--output") && Files.isDirectory(Paths.get(args[i + 1]))) {
-                return Paths.get(args[i + 1]);
-            } else {
-                throw new CLIException(args[i], "Invalid path");
-            }
-        } else {
-            throw(new CLIException(args[i], "Missing argument: path/to/file"));
+            log.info("\t - Reading artifacts from GAV-list at " + this.artifactConfig.inputListFile);
         }
     }
 
@@ -259,20 +141,26 @@ public abstract class MavenCentralAnalysis {
      * @throws URISyntaxException when there is an issue with the url built
      * @throws IOException when there is an issue opening a file
      */
-    public Map<ArtifactIdent, Artifact> runAnalysis(String[] args) throws URISyntaxException, IOException {
-        parseCmdLine(args);
-        printRunInfo();
-        if(setupInfo.isOutput()) {
-            resolverFactory = new ResolverFactory(setupInfo.isOutput(), setupInfo.getToOutputDirectory(), processTransitives);
+    public final Map<ArtifactIdent, Artifact> runAnalysis(String[] args) throws URISyntaxException, IOException {
+        // Obtain CLI arguments
+        try {
+            this.artifactConfig = new ArtifactConfigParser().parseArtifactConfig(args);
+            printRunInfo();
+        } catch(CLIException clix){
+            throw new RuntimeException(clix);
+        }
+        
+        if(this.artifactConfig.outputEnabled) {
+            resolverFactory = new ResolverFactory(this.artifactConfig.outputEnabled, this.artifactConfig.outputDirectory, processTransitives);
         } else {
             resolverFactory = new ResolverFactory(processTransitives);
         }
 
-        if(setupInfo.isMulti()) {
+        if(this.artifactConfig.multipleThreads) {
             ActorSystem system = ActorSystem.create("my-system");
-            queueActorRef = system.actorOf(QueueActor.props(setupInfo.getThreads(), system, 0,0, null), "queueActor");
+            queueActorRef = system.actorOf(QueueActor.props(this.artifactConfig.threadCount, system, 0,0, null), "queueActor");
 
-            if(setupInfo.getToCoordinates() == null) {
+            if(this.artifactConfig.inputListFile == null) {
                 indexProcessor();
             } else {
                 readIdentsIn();
@@ -284,7 +172,7 @@ public abstract class MavenCentralAnalysis {
                 e.printStackTrace();
             }
         } else {
-            if(setupInfo.getToCoordinates() == null) {
+            if(this.artifactConfig.inputListFile == null) {
                 indexProcessor();
             } else {
                 readIdentsIn();
@@ -306,35 +194,35 @@ public abstract class MavenCentralAnalysis {
         IndexIterator indexIterator;
 
         //set up indexIterator here (skip to a position or start from the start)
-        if (setupInfo.getToIndexPos() != null) {
+        if (this.artifactConfig.progressRestoreFile != null) {
             indexIterator = new IndexIterator(new URI(base), getStartingPos());
-        } else if(setupInfo.getSkip() != -1) {
-            indexIterator = new IndexIterator(new URI(base), setupInfo.getSkip());
+        } else if(this.artifactConfig.skip != -1) {
+            indexIterator = new IndexIterator(new URI(base), this.artifactConfig.skip);
         } else {
             indexIterator = new IndexIterator(new URI(base));
         }
 
         if (resolveIndex) {
-            if (setupInfo.getSkip() != -1 && setupInfo.getTake() != -1) {
-                walkPaginated(setupInfo.getTake(), indexIterator);
-            } else if (setupInfo.getSince() != -1 && setupInfo.getUntil() != -1) {
-                walkDates(setupInfo.getSince(), setupInfo.getUntil(), indexIterator);
+            if (this.artifactConfig.skip != -1 && this.artifactConfig.take != -1) {
+                walkPaginated(this.artifactConfig.take, indexIterator);
+            } else if (this.artifactConfig.since != -1 && this.artifactConfig.until != -1) {
+                walkDates(this.artifactConfig.since, this.artifactConfig.until, indexIterator);
             } else {
                 walkAllIndexes(indexIterator);
             }
-        } else if (setupInfo.getSkip() != -1 && setupInfo.getTake() != -1) {
-            lazyWalkPaginated(setupInfo.getTake(), indexIterator);
-        } else if (setupInfo.getSince() != -1 && setupInfo.getUntil() != -1) {
-            lazyWalkDates(setupInfo.getSince(), setupInfo.getUntil(), indexIterator);
+        } else if (this.artifactConfig.skip != -1 && this.artifactConfig.take != -1) {
+            lazyWalkPaginated(this.artifactConfig.take, indexIterator);
+        } else if (this.artifactConfig.since != -1 && this.artifactConfig.until != -1) {
+            lazyWalkDates(this.artifactConfig.since, this.artifactConfig.until, indexIterator);
         } else {
             lazyWalkAllIndexes(indexIterator);
         }
 
-        writeLastProcessed(indexIterator.getIndex(), setupInfo.getName());
+        writeLastProcessed(indexIterator.getIndex(), this.artifactConfig.progressOutputFile);
     }
 
     private void processIndex(Artifact current) {
-        if(setupInfo.isMulti()) {
+        if(this.artifactConfig.multipleThreads) {
             queueActorRef.tell(new ProcessIdentifierMessage(current.getIdent(), this), ActorRef.noSender());
         } else {
             callResolver(current.getIdent());
@@ -357,18 +245,18 @@ public abstract class MavenCentralAnalysis {
         while(indexIterator.hasNext()) {
             Artifact current = ArtifactFactory.createArtifact(indexIterator.next());
             artifacts.add(current);
-            if(setupInfo.isOutput() && !resolvePom && !resolveJar) {
-                Path filePath = setupInfo.getToOutputDirectory().resolve(current.getIdent().getGroupID() + "-" + current.getIdent().getArtifactID() + "-" + current.getIdent().getVersion() + ".txt");
+            if(this.artifactConfig.outputEnabled && !resolvePom && !resolveJar) {
+                Path filePath = this.artifactConfig.outputDirectory.resolve(current.getIdent().getGroupID() + "-" + current.getIdent().getArtifactID() + "-" + current.getIdent().getVersion() + ".txt");
                 if(!Files.exists(filePath)) {
                     Files.createFile(filePath);
                 }
             }
             processIndex(current);
-            if(indexIterator.getIndex() % setupInfo.getWriteProcessedIndexes() == 0)
-                writeLastProcessed(indexIterator.getIndex(), setupInfo.getName());
+            if(indexIterator.getIndex() % this.artifactConfig.progressWriteInterval == 0)
+                writeLastProcessed(indexIterator.getIndex(), this.artifactConfig.progressOutputFile);
         }
 
-        if(setupInfo.isMulti()) {
+        if(this.artifactConfig.multipleThreads) {
             queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
         }
 
@@ -392,19 +280,19 @@ public abstract class MavenCentralAnalysis {
         take += indexIterator.getIndex();
         while(indexIterator.hasNext() && indexIterator.getIndex() < take) {
             Artifact current = ArtifactFactory.createArtifact(indexIterator.next());
-            if(setupInfo.isOutput() && !resolvePom && !resolveJar) {
-                Path filePath = setupInfo.getToOutputDirectory().resolve(current.getIdent().getGroupID() + "-" + current.getIdent().getArtifactID() + "-" + current.getIdent().getVersion() + ".txt");
+            if(this.artifactConfig.outputEnabled && !resolvePom && !resolveJar) {
+                Path filePath = this.artifactConfig.outputDirectory.resolve(current.getIdent().getGroupID() + "-" + current.getIdent().getArtifactID() + "-" + current.getIdent().getVersion() + ".txt");
                 if(!Files.exists(filePath)) {
                     Files.createFile(filePath);
                 }
             }
             artifacts.add(current);
             processIndex(current);
-            if(indexIterator.getIndex() % setupInfo.getWriteProcessedIndexes() == 0)
-                writeLastProcessed(indexIterator.getIndex(), setupInfo.getName());
+            if(indexIterator.getIndex() % this.artifactConfig.progressWriteInterval == 0)
+                writeLastProcessed(indexIterator.getIndex(), this.artifactConfig.progressOutputFile);
         }
 
-        if(setupInfo.isMulti()) {
+        if(this.artifactConfig.multipleThreads) {
             queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
         }
 
@@ -433,8 +321,8 @@ public abstract class MavenCentralAnalysis {
             currentToSince = temp.getLastModified();
             if(currentToSince >= since && currentToSince < until) {
                 Artifact current = ArtifactFactory.createArtifact(indexIterator.next());
-                if(setupInfo.isOutput() && !resolvePom && !resolveJar) {
-                    Path filePath = setupInfo.getToOutputDirectory().resolve(current.getIdent().getGroupID() + "-" + current.getIdent().getArtifactID() + "-" + current.getIdent().getVersion() + ".txt");
+                if(this.artifactConfig.outputEnabled && !resolvePom && !resolveJar) {
+                    Path filePath = this.artifactConfig.outputDirectory.resolve(current.getIdent().getGroupID() + "-" + current.getIdent().getArtifactID() + "-" + current.getIdent().getVersion() + ".txt");
                     if(!Files.exists(filePath)) {
                         Files.createFile(filePath);
                     }
@@ -442,11 +330,11 @@ public abstract class MavenCentralAnalysis {
                 artifacts.add(current);
                 processIndex(current);
             }
-            if(indexIterator.getIndex() % setupInfo.getWriteProcessedIndexes() == 0)
-                writeLastProcessed(indexIterator.getIndex(), setupInfo.getName());
+            if(indexIterator.getIndex() % this.artifactConfig.progressWriteInterval == 0)
+                writeLastProcessed(indexIterator.getIndex(), this.artifactConfig.progressOutputFile);
         }
 
-        if(setupInfo.isMulti()) {
+        if(this.artifactConfig.multipleThreads) {
             queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
         }
 
@@ -455,7 +343,7 @@ public abstract class MavenCentralAnalysis {
     }
 
     private void processIndexIdentifier(ArtifactIdent ident) {
-        if(setupInfo.isMulti()){
+        if(this.artifactConfig.multipleThreads){
             queueActorRef.tell(new ProcessIdentifierMessage(ident, this), ActorRef.noSender());
         } else {
             callResolver(ident);
@@ -477,18 +365,18 @@ public abstract class MavenCentralAnalysis {
         while(indexIterator.hasNext()) {
             ArtifactIdent ident = indexIterator.next().getIdent();
             idents.add(ident);
-            if(setupInfo.isOutput() && !resolvePom && !resolveJar) {
-                Path filePath = setupInfo.getToOutputDirectory().resolve(ident.getGroupID() + "-" + ident.getArtifactID() + "-" + ident.getVersion() + ".txt");
+            if(this.artifactConfig.outputEnabled && !resolvePom && !resolveJar) {
+                Path filePath = this.artifactConfig.outputDirectory.resolve(ident.getGroupID() + "-" + ident.getArtifactID() + "-" + ident.getVersion() + ".txt");
                 if(!Files.exists(filePath)) {
                     Files.createFile(filePath);
                 }
             }
             processIndexIdentifier(ident);
-            if(indexIterator.getIndex() % setupInfo.getWriteProcessedIndexes() == 0)
-                writeLastProcessed(indexIterator.getIndex(), setupInfo.getName());
+            if(indexIterator.getIndex() % this.artifactConfig.progressWriteInterval == 0)
+                writeLastProcessed(indexIterator.getIndex(), this.artifactConfig.progressOutputFile);
         }
 
-        if(setupInfo.isMulti()) {
+        if(this.artifactConfig.multipleThreads) {
             queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
         }
 
@@ -511,18 +399,18 @@ public abstract class MavenCentralAnalysis {
         while(indexIterator.hasNext() && indexIterator.getIndex() < take) {
             ArtifactIdent ident = indexIterator.next().getIdent();
             idents.add(ident);
-            if(setupInfo.isOutput() && !resolvePom && !resolveJar) {
-                Path filePath = setupInfo.getToOutputDirectory().resolve(ident.getGroupID() + "-" + ident.getArtifactID() + "-" + ident.getVersion() + ".txt");
+            if(this.artifactConfig.outputEnabled && !resolvePom && !resolveJar) {
+                Path filePath = this.artifactConfig.outputDirectory.resolve(ident.getGroupID() + "-" + ident.getArtifactID() + "-" + ident.getVersion() + ".txt");
                 if(!Files.exists(filePath)) {
                     Files.createFile(filePath);
                 }
             }
             processIndexIdentifier(ident);
-            if(indexIterator.getIndex() % setupInfo.getWriteProcessedIndexes() == 0)
-                writeLastProcessed(indexIterator.getIndex(), setupInfo.getName());
+            if(indexIterator.getIndex() % this.artifactConfig.progressWriteInterval == 0)
+                writeLastProcessed(indexIterator.getIndex(), this.artifactConfig.progressOutputFile);
         }
 
-        if(setupInfo.isMulti()) {
+        if(this.artifactConfig.multipleThreads) {
             queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
         }
         indexIterator.closeReader();
@@ -550,19 +438,19 @@ public abstract class MavenCentralAnalysis {
             if(currentToSince >= since && currentToSince < until) {
                 ArtifactIdent ident = temp.getIdent();
                 idents.add(ident);
-                if(setupInfo.isOutput() && !resolvePom && !resolveJar) {
-                    Path filePath = setupInfo.getToOutputDirectory().resolve(ident.getGroupID() + "-" + ident.getArtifactID() + "-" + ident.getVersion() + ".txt");
+                if(this.artifactConfig.outputEnabled && !resolvePom && !resolveJar) {
+                    Path filePath = this.artifactConfig.outputDirectory.resolve(ident.getGroupID() + "-" + ident.getArtifactID() + "-" + ident.getVersion() + ".txt");
                     if(!Files.exists(filePath)) {
                         Files.createFile(filePath);
                     }
                 }
                 processIndexIdentifier(ident);
             }
-            if(indexIterator.getIndex() % setupInfo.getWriteProcessedIndexes() == 0)
-                writeLastProcessed(indexIterator.getIndex(), setupInfo.getName());
+            if(indexIterator.getIndex() % this.artifactConfig.progressWriteInterval == 0)
+                writeLastProcessed(indexIterator.getIndex(), this.artifactConfig.progressOutputFile);
         }
 
-        if(setupInfo.isMulti()) {
+        if(this.artifactConfig.multipleThreads) {
             queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
         }
 
@@ -583,7 +471,7 @@ public abstract class MavenCentralAnalysis {
      * @return a list of identifiers collected from the file
      */
     public List<ArtifactIdent> readIdentsIn() {
-        Path toCoordinates = setupInfo.getToCoordinates();
+        Path toCoordinates = this.artifactConfig.inputListFile;
 
         BufferedReader coordinatesReader;
         List<ArtifactIdent> identifiers = new ArrayList<>();
@@ -592,11 +480,11 @@ public abstract class MavenCentralAnalysis {
             String line = coordinatesReader.readLine();
 
             int i = -1;
-            if(setupInfo.getSkip() != -1 && setupInfo.getTake() != -1) {
+            if(this.artifactConfig.skip != -1 && this.artifactConfig.take != -1) {
                 int toSkip = 0;
                 int curTake = 0;
-                while(line != null && curTake < setupInfo.getTake()) {
-                    if(toSkip >= setupInfo.getSkip()) {
+                while(line != null && curTake < this.artifactConfig.take) {
+                    if(toSkip >= this.artifactConfig.skip) {
                         String[] parts = line.split(":");
                         if(parts.length == 3) {
                             ArtifactIdent current = new ArtifactIdent(parts[0], parts[1], parts[2]);
@@ -611,7 +499,7 @@ public abstract class MavenCentralAnalysis {
                     toSkip++;
                     i++;
                 }
-            } else if(setupInfo.getToIndexPos() != null) {
+            } else if(this.artifactConfig.progressRestoreFile != null) {
                 long start = getStartingPos();
                 int curPos = 0;
                 while(line != null) {
@@ -644,11 +532,11 @@ public abstract class MavenCentralAnalysis {
                 }
             }
 
-            if(setupInfo.isMulti()) {
+            if(this.artifactConfig.multipleThreads) {
                 queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
             }
 
-            writeLastProcessed(i, setupInfo.getName());
+            writeLastProcessed(i, this.artifactConfig.progressOutputFile);
             coordinatesReader.close();
         } catch(IOException e) {
             throw new RuntimeException(e);
@@ -659,7 +547,7 @@ public abstract class MavenCentralAnalysis {
     private long getStartingPos() {
         BufferedReader indexReader;
         try {
-            indexReader = new BufferedReader(new FileReader(setupInfo.getToIndexPos().toFile()));
+            indexReader = new BufferedReader(new FileReader(this.artifactConfig.progressRestoreFile.toFile()));
             String line = indexReader.readLine();
             return Integer.parseInt(line);
         } catch (IOException e) {

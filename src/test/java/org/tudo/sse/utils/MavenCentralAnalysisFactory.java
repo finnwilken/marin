@@ -1,6 +1,6 @@
 package org.tudo.sse.utils;
 
-import org.tudo.sse.MavenCentralAnalysis;
+import org.tudo.sse.analyses.MavenCentralArtifactAnalysis;
 import org.tudo.sse.analyses.MavenCentralLibraryAnalysis;
 import org.tudo.sse.model.Artifact;
 
@@ -8,21 +8,21 @@ import java.util.List;
 
 public class MavenCentralAnalysisFactory {
 
-    public static MavenCentralAnalysis buildEmptyAnalysisWithNoRequirements() {
+    public static MavenCentralArtifactAnalysis buildEmptyAnalysisWithNoRequirements() {
         return buildAnalysisWithRequirements(false, false, false, false);
     }
 
-    public static MavenCentralAnalysis buildEmptyAnalysisWithPomRequirement() {
+    public static MavenCentralArtifactAnalysis buildEmptyAnalysisWithPomRequirement() {
         return buildAnalysisWithRequirements(false, true, false, false);
     }
 
-    public static MavenCentralAnalysis buildEmptyAnalysisWithIndexRequirement() {
+    public static MavenCentralArtifactAnalysis buildEmptyAnalysisWithIndexRequirement() {
         return buildAnalysisWithRequirements(true, false, false, false);
     }
 
-    private static MavenCentralAnalysis buildAnalysisWithRequirements(boolean requiresIndex, boolean requiresPom,
-                                                                      boolean requiresTransitives, boolean requiresJar) {
-        return new MavenCentralAnalysis(requiresIndex, requiresPom, requiresTransitives, requiresJar) {
+    private static MavenCentralArtifactAnalysis buildAnalysisWithRequirements(boolean requiresIndex, boolean requiresPom,
+                                                                              boolean requiresTransitives, boolean requiresJar) {
+        return new MavenCentralArtifactAnalysis(requiresIndex, requiresPom, requiresTransitives, requiresJar) {
             @Override
             public void analyzeArtifact(Artifact current) {
 

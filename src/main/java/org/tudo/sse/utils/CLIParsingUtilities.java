@@ -6,11 +6,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-public abstract class CLIParser {
+interface CLIParsingUtilities {
 
-    public abstract void parseArguments(String[] args);
-
-    protected int nextArgAsInt(String[] args, int i) throws CLIException {
+    default int nextArgAsInt(String[] args, int i) throws CLIException {
         if(i + 1 < args.length) {
             try{
                 return Integer.parseInt(args[i + 1]);
@@ -22,7 +20,7 @@ public abstract class CLIParser {
         }
     }
 
-    protected long[] nextArgAsLongPair(String[] args, int i) throws CLIException {
+    default long[] nextArgAsLongPair(String[] args, int i) throws CLIException {
         long[] toReturn = new long[2];
         if(i + 1 < args.length) {
             String[] ints = args[i + 1].split(":");
@@ -42,7 +40,7 @@ public abstract class CLIParser {
         return toReturn;
     }
 
-    protected Path nextArgAsPath(String[] args, int i) throws CLIException {
+    default Path nextArgAsPath(String[] args, int i) throws CLIException {
         if(i + 1 < args.length) {
             return Paths.get(args[i + 1]);
         } else {
@@ -50,7 +48,7 @@ public abstract class CLIParser {
         }
     }
 
-    protected Path nextArgAsRegularFileReference(String[] args, int i) throws CLIException {
+    default Path nextArgAsRegularFileReference(String[] args, int i) throws CLIException {
         final Path path = nextArgAsPath(args, i);
         if(Files.isRegularFile(path))
             return path;
@@ -58,7 +56,7 @@ public abstract class CLIParser {
             throw new CLIException("Expected an existing file but got: " + path, args[i]);
     }
 
-    protected Path nextArgAsDirectoryReference(String[] args, int i) throws CLIException {
+    default Path nextArgAsDirectoryReference(String[] args, int i) throws CLIException {
         final Path path = nextArgAsPath(args, i);
         if(Files.isDirectory(path))
             return path;

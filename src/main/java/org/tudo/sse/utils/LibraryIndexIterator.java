@@ -3,11 +3,8 @@ package org.tudo.sse.utils;
 import org.apache.maven.index.reader.ChunkReader;
 import org.apache.maven.index.reader.IndexReader;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
@@ -21,22 +18,13 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
     private final IndexReader mavenIndexReader;
     private final ChunkReader mavenChunkReader;
 
-    private final Path progressOutputFilePath;
-
-    final long progressSaveInternal;
-    private long lastPositionSaved;
     private long currentPosition;
-    private boolean saveProgress;
 
     private String currentLibraryGA;
     private String nextLibraryGA;
 
-    public LibraryIndexIterator(URI baseUri, Path progressOutputFile, long progressSaveInterval) throws IOException {
+    public LibraryIndexIterator(URI baseUri) throws IOException {
         this.libraryHashesSeen = new HashSet<>();
-
-        this.saveProgress = true;
-        this.progressOutputFilePath = progressOutputFile;
-        this.progressSaveInternal = progressSaveInterval;
 
         // Build intermediate readers that must be kept open until iterator is done and resources can be closed
         this.mavenIndexReader = new IndexReader(null, new HttpResourceHandler(baseUri.resolve(".index/")));
@@ -45,23 +33,15 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
         // Build the actual iterator for entries in the Maven Central index
         this.entryIterator = this.mavenChunkReader.iterator();
 
-        this.lastPositionSaved = -1;
         this.currentPosition = -1;
         this.currentLibraryGA = null;
     }
 
-    public void setSaveProgress(boolean saveProgress){
-        this.saveProgress = saveProgress;
-    }
 
     public void setPosition(long startIdx){
         while(this.currentPosition < startIdx && this.hasNext()){
             this.next();
         }
-    }
-
-    public long getPosition() {
-        return this.currentPosition;
     }
 
     public boolean hasNext() {
@@ -95,7 +75,6 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
             this.libraryHashesSeen.add(this.currentLibraryGA.hashCode());
             this.currentLibraryGA = null;
 
-            writeProgressIfNeeded();
             currentPosition += 1;
 
             return valueToReturn;
@@ -153,15 +132,6 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
         return entryIterator.next();
     }
 
-    private void writeProgressIfNeeded(){
-        if(this.saveProgress && this.currentPosition - this.lastPositionSaved >= this.progressSaveInternal){
-            try(BufferedWriter writer = new BufferedWriter(new FileWriter(this.progressOutputFilePath.toFile()))){
-                // Write position of last GA, as it has now been completed!
-                writer.write(String.valueOf(currentPosition - 1));
-            } catch(IOException ignored){}
-            this.lastPositionSaved = currentPosition;
-        }
-    }
 
     @Override
     public void close() throws Exception {

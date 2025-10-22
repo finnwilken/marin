@@ -4,22 +4,21 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.tudo.sse.ArtifactFactory;
+import org.tudo.sse.CLIException;
 import org.tudo.sse.model.Artifact;
-import org.tudo.sse.utils.MavenCentralAnalysisFactory;
+import org.tudo.sse.utils.CommonConfigParser;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class MavenCentralLibraryAnalysisTest {
-
-    final MavenCentralLibraryAnalysis emptyAnalysis =
-            MavenCentralAnalysisFactory.buildEmptyLibraryAnalysisWithNoRequirements();
 
     @AfterEach
     public void cleanup(){
@@ -29,64 +28,80 @@ public class MavenCentralLibraryAnalysisTest {
     @Test
     @DisplayName("The CLI parser must parse common argument values correctly")
     void parseCLIRegular(){
-        final String validArgs = "-st 20:10000 --progress-restore-file pom.xml --progress-output-file marin-progress --multi 12 --save-progress-interval 20";
-        final String[] argsArray = validArgs.split(" ");
+        final String validArgs = "--skip-take 20:10000 --progress-restore-file pom.xml --progress-output-file marin-progress --threads 12 --save-progress-interval 20";
+        final CommonConfigParser.CommonConfig config = parseCLI(validArgs);
 
-        emptyAnalysis.config.parseArguments(argsArray);
-
-        assert(emptyAnalysis.config.multipleThreads);
-        assertEquals(12, emptyAnalysis.config.threadCount);
-        assertEquals(Paths.get("pom.xml"), emptyAnalysis.config.progressRestoreFile);
-        assertEquals(Paths.get("marin-progress"), emptyAnalysis.config.progressOutputFile);
-        assertEquals(20, emptyAnalysis.config.skip);
-        assertEquals(10000, emptyAnalysis.config.take);
-        assertEquals(20, emptyAnalysis.config.progressWriteInterval);
-        assertNull(emptyAnalysis.config.gaInputListFile);
+        assert(config.multipleThreads);
+        assertEquals(12, config.threadCount);
+        assertEquals(Paths.get("pom.xml"), config.progressRestoreFile);
+        assertEquals(Paths.get("marin-progress"), config.progressOutputFile);
+        assertEquals(20, config.skip);
+        assertEquals(10000, config.take);
+        assertEquals(20, config.progressWriteInterval);
+        assertNull(config.inputListFile);
     }
+
+    @Test
+    @DisplayName("The CLI parser must parse common argument values correctly using shorthand argument names")
+    void parseCLIShorthands(){
+        final String validArgs = "-st 20:10000 -prf pom.xml -pof marin-progress -t 12 -spi 20";
+        final CommonConfigParser.CommonConfig config = parseCLI(validArgs);
+
+        assert(config.multipleThreads);
+        assertEquals(12, config.threadCount);
+        assertEquals(Paths.get("pom.xml"), config.progressRestoreFile);
+        assertEquals(Paths.get("marin-progress"), config.progressOutputFile);
+        assertEquals(20, config.skip);
+        assertEquals(10000, config.take);
+        assertEquals(20, config.progressWriteInterval);
+        assertNull(config.inputListFile);
+    }
+
+
 
     @Test
     @DisplayName("The CLI parser must set the correct defaults for empty arguments")
     void parseCLIDefaults(){
-        emptyAnalysis.config.parseArguments(new String[]{});
+        final CommonConfigParser.CommonConfig config = parseCLI("");
 
-        assertFalse(emptyAnalysis.config.multipleThreads);
-        assertEquals(1, emptyAnalysis.config.threadCount);
-        assertNull(emptyAnalysis.config.progressRestoreFile);
-        assertEquals(Paths.get("marin-progress"), emptyAnalysis.config.progressOutputFile);
-        assertEquals(-1, emptyAnalysis.config.skip);
-        assertEquals(-1, emptyAnalysis.config.take);
-        assertEquals(100, emptyAnalysis.config.progressWriteInterval);
-        assertNull(emptyAnalysis.config.gaInputListFile);
+        assertFalse(config.multipleThreads);
+        assertEquals(1, config.threadCount);
+        assertNull(config.progressRestoreFile);
+        assertEquals(Paths.get("marin-progress"), config.progressOutputFile);
+        assertEquals(-1, config.skip);
+        assertEquals(-1, config.take);
+        assertEquals(100, config.progressWriteInterval);
+        assertNull(config.inputListFile);
     }
 
     @Test
     @DisplayName("The CLI parser must fail if input files do not exist")
     void parseNonExistingFile(){
         final String validArgs = "--progress-restore-file foo.input";
-        final String[] argsArray = validArgs.split(" ");
 
-        assertThrows(RuntimeException.class, () -> emptyAnalysis.config.parseArguments(argsArray));
+        assertThrows(RuntimeException.class, () -> parseCLI(validArgs));
     }
 
     @Test
     @DisplayName("The CLI parser must accept pagination on custom GA input lists")
     void parseCustomGA(){
-        final String validArgs = "-st 20:10000 --coordinates pom.xml";
-        final String[] argsArray = validArgs.split(" ");
+        final String validArgs = "-st 20:10000 --inputs pom.xml";
 
-        emptyAnalysis.config.parseArguments(argsArray);
+        final CommonConfigParser.CommonConfig config = parseCLI(validArgs);
 
-        assertEquals(Paths.get("pom.xml"), emptyAnalysis.config.gaInputListFile);
-        assertEquals(20, emptyAnalysis.config.skip);
+        assertEquals(Paths.get("pom.xml"), config.inputListFile);
+        assertEquals(20, config.skip);
     }
 
     @Test
-    @DisplayName("The CLI parser must not accept setting an index position on a custom GA input list")
+    @DisplayName("The CLI parser must accept setting an index position on a custom GA input list")
     void parseNonExistingIndex(){
-        final String validArgs = "--progress-restore-file pom.xml --coordinates pom.xml";
-        final String[] argsArray = validArgs.split(" ");
+        final String validArgs = "--progress-restore-file pom.xml --inputs pom.xml";
 
-        assertThrows(RuntimeException.class, () -> emptyAnalysis.config.parseArguments(argsArray));
+        final CommonConfigParser.CommonConfig config = parseCLI(validArgs);
+
+        assertEquals(Paths.get("pom.xml"), config.inputListFile);
+        assertEquals(Paths.get("pom.xml"), config.progressRestoreFile);
     }
 
     @Test
@@ -170,7 +185,7 @@ public class MavenCentralLibraryAnalysisTest {
 
         long progress = Long.parseLong(Files.readString(analysis.config.progressOutputFile));
 
-        assert((progress - 5000) < analysis.config.progressWriteInterval);
+        assert(progress >= 5005);
     }
 
     @Test
@@ -190,7 +205,7 @@ public class MavenCentralLibraryAnalysisTest {
             }
         };
 
-        final String args = "-st 5000:500 --multi 8";
+        final String args = "-st 5000:500 --threads 8";
         final String[] argsArray = args.split(" ");
 
         analysis.runAnalysis(argsArray);
@@ -227,7 +242,7 @@ public class MavenCentralLibraryAnalysisTest {
             }
         };
 
-        final String args = "--coordinates " + validLibraryInput.toAbsolutePath();
+        final String args = "--inputs " + validLibraryInput.toAbsolutePath();
         final String[] argsArray = args.split(" ");
 
         analysis.runAnalysis(argsArray);
@@ -259,7 +274,7 @@ public class MavenCentralLibraryAnalysisTest {
             }
         };
 
-        final String args = "-st 1:2 --coordinates " + validLibraryInput.toAbsolutePath();
+        final String args = "-st 1:2 --inputs " + validLibraryInput.toAbsolutePath();
         final String[] argsArray = args.split(" ");
 
         analysis.runAnalysis(argsArray);
@@ -271,7 +286,7 @@ public class MavenCentralLibraryAnalysisTest {
 
     @Test
     @DisplayName("An analysis with input file must not fail on invalid inputs")
-    void analysisFromInvalidFile() throws IOException {
+    void analysisFromInvalidFile() {
 
         final Path validLibraryInput = testResource("library-names-invalid.txt");
 
@@ -285,7 +300,7 @@ public class MavenCentralLibraryAnalysisTest {
             }
         };
 
-        final String args = "--coordinates " + validLibraryInput.toAbsolutePath();
+        final String args = "--inputs " + validLibraryInput.toAbsolutePath();
         final String[] argsArray = args.split(" ");
 
         analysis.runAnalysis(argsArray);
@@ -293,7 +308,7 @@ public class MavenCentralLibraryAnalysisTest {
 
     @Test
     @DisplayName("An analysis must apply pagination on top of progress restore values")
-    void analysisWithRestoreAndPagination() throws IOException {
+    void analysisWithRestoreAndPagination() {
 
         final Path restoreFile = testResource("testingIndexPosition.txt");
 
@@ -321,11 +336,20 @@ public class MavenCentralLibraryAnalysisTest {
 
     private Path testResource(String pathToResource){
         try {
-            return Path.of(getClass().getClassLoader().getResource(pathToResource).toURI());
+            return Path.of(Objects.requireNonNull(getClass().getClassLoader().getResource(pathToResource)).toURI());
         } catch (Exception x){
             fail("Test setup: Failed to load resource file " + pathToResource, x);
         }
         return null;
+    }
+
+    private CommonConfigParser.CommonConfig parseCLI(String cli) {
+        try {
+            if(cli.isBlank()) return new CommonConfigParser().parseCommonConfig(new String[]{});
+            else return new CommonConfigParser().parseCommonConfig(cli.split(" "));
+        } catch(CLIException clix) {
+            throw new RuntimeException(clix);
+        }
     }
 
 }
