@@ -168,19 +168,20 @@ class MavenCentralArtifactAnalysisTest {
 
             try {
                 IndexIterator iterator = new IndexIterator(new URI(base), start1);
-                List<Artifact> collected1 = new ArrayList<>(analysisUnderTest.walkPaginated(take, iterator));
+                List<ArtifactIdent> collected1 = new ArrayList<>(analysisUnderTest.walkPaginated(take, iterator));
 
-                Artifact lastOne = collected1.get(collected1.size() - 1);
+                Artifact lastOne = ArtifactFactory.getArtifact(collected1.get(collected1.size() - 1));
                 int i = 2;
                 while(lastOne.getIndexInformation().getIndex() > start2) {
-                    lastOne = collected1.get(collected1.size() - i);
+                    lastOne = ArtifactFactory.getArtifact(collected1.get(collected1.size() - i));
                     i++;
                 }
 
                 iterator = new IndexIterator(new URI(base), start2);
 
-                List<Artifact> collected2 = new ArrayList<>(analysisUnderTest.walkPaginated(1, iterator));
-                assertEquals(lastOne.getIndexInformation().getIndex(), collected2.get(0).getIndexInformation().getIndex());
+                List<ArtifactIdent> collected2 = new ArrayList<>(analysisUnderTest.walkPaginated(1, iterator));
+                long lastOne2 = ArtifactFactory.getArtifact(collected2.get(0)).getIndexInformation().getIndex();
+                assertEquals(lastOne.getIndexInformation().getIndex(), lastOne2);
             } catch (IOException | URISyntaxException e) {
                 throw new RuntimeException(e);
             }
@@ -205,9 +206,10 @@ class MavenCentralArtifactAnalysisTest {
 
         int i = 0;
         for(String[] arg : cliInputs) {
-            analysisUnderTest.runAnalysis(arg);
+            MavenCentralArtifactAnalysis tester = MavenCentralAnalysisFactory.buildEmptyAnalysisWithNoRequirements();
+            tester.runAnalysis(arg);
 
-            Path indexPath = analysisUnderTest.getSetupInfo().progressOutputFile;
+            Path indexPath = tester.getSetupInfo().progressOutputFile;
             assert(indexPath != null);
             long ending = getEndingIndex(indexPath);
 
@@ -235,22 +237,24 @@ class MavenCentralArtifactAnalysisTest {
         cliInputs.add(args);
 
         List<List<String>> expected = (List<List<String>>) json.get("readIdentsIn");
-        int[] expectedEndings = {9, 9, 8, 8, 9, 9};
+        int[] expectedEndings = {10, 10, 9, 9, 10, 10};
 
         int i = 0;
         for(String[] arg : cliInputs) {
             List<String> curExpected = expected.get(i);
             MavenCentralArtifactAnalysis tester = MavenCentralAnalysisFactory.buildEmptyAnalysisWithNoRequirements();
-            // Apply arguments once
-            tester.runAnalysis(arg);
-            List<ArtifactIdent> idents = tester.readIdentsIn();
-            Path progressFile = tester.getSetupInfo().progressOutputFile;
 
+            // Apply arguments, check progress is stored correctly
+            tester.runAnalysis(arg);
+            Path progressFile = tester.getSetupInfo().progressOutputFile;
+            long ending = getEndingIndex(progressFile);
+            assertEquals(expectedEndings[i], ending);
+
+            // Process file a second time to obtain return value
+            List<ArtifactIdent> idents = tester.processArtifactsFromInputFile();
             assertEquals(curExpected.size(), idents.size());
 
-            long ending = getEndingIndex(progressFile);
 
-            assertEquals(expectedEndings[i], ending);
 
             for(ArtifactIdent actual: idents) {
                 final String actualCoordinates = actual.getCoordinates();

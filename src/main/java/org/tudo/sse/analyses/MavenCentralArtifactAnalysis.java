@@ -2,8 +2,6 @@ package org.tudo.sse.analyses;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.tudo.sse.ArtifactFactory;
 import org.tudo.sse.CLIException;
 import org.tudo.sse.model.Artifact;
@@ -13,18 +11,17 @@ import org.tudo.sse.multithreading.ProcessIdentifierMessage;
 import org.tudo.sse.multithreading.WorkloadIsFinalMessage;
 import org.tudo.sse.resolution.ResolverFactory;
 import org.tudo.sse.utils.ArtifactConfigParser;
+import org.tudo.sse.utils.FileBasedArtifactIterator;
 import org.tudo.sse.utils.IndexIterator;
 import org.tudo.sse.multithreading.QueueActor;
 import org.tudo.sse.utils.MavenCentralRepository;
 
 import java.io.*;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 
 /**
  * The MavenCentralAnalysis enables analysis of artifacts on the maven central repository for jobs of any size.
@@ -35,6 +32,10 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
     private ArtifactConfigParser.ArtifactConfig artifactConfig;
     private ActorRef queueActorRef;
     private ResolverFactory resolverFactory;
+
+
+    private long currentPosition = 0;
+    private long lastPositionSaved = 0;
 
     /**
      * Creates a new Maven Central Analysis with the given configuration options.
@@ -116,7 +117,10 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
         } catch(CLIException clix){
             throw new RuntimeException(clix);
         }
-        
+
+        ActorSystem system = null;
+
+        // Initialize resolver factory
         if(this.artifactConfig.outputEnabled) {
             resolverFactory = new ResolverFactory(this.artifactConfig.outputEnabled, this.artifactConfig.outputDirectory, processTransitives);
         } else {
@@ -124,26 +128,25 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
         }
 
         if(this.artifactConfig.multipleThreads) {
-            final ActorSystem system = ActorSystem.create("marin-actors");
-            queueActorRef = system.actorOf(QueueActor.props(this.artifactConfig.threadCount, system, 0, artifactConfig.progressWriteInterval, artifactConfig.progressOutputFile), "queueActor");
+            system = ActorSystem.create("marin-actors");
+            // Compute position at which processing will start
+            final long initialPosition = getInitialPosition();
+            this.queueActorRef = system.actorOf(QueueActor.props(this.artifactConfig.threadCount, system, initialPosition,
+                    artifactConfig.progressWriteInterval, artifactConfig.progressOutputFile), "queueActor");
+        }
 
-            if(this.artifactConfig.inputListFile == null) {
-                indexProcessor();
-            } else {
-                readIdentsIn();
-            }
-
-            try {
-                system.getWhenTerminated().toCompletableFuture().get();
-            } catch (Exception e) {
-                log.warn("Failed to close actor system", e);
-            }
+        if(this.artifactConfig.inputListFile == null) {
+            indexProcessor();
         } else {
-            if(this.artifactConfig.inputListFile == null) {
-                indexProcessor();
-            } else {
-                readIdentsIn();
-            }
+            processArtifactsFromInputFile();
+        }
+
+        if(system != null){
+            try {
+                // Tell the queue that no more work items will follow
+                this.queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
+                system.getWhenTerminated().toCompletableFuture().get();
+            } catch (Exception x) { log.warn("Error closing actor system: {}", x.getMessage());}
         }
     }
 
@@ -152,35 +155,24 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
      * @see ArtifactIdent
      */
     public void indexProcessor() {
-        IndexIterator indexIterator;
 
         try {
-            //set up indexIterator here (skip to a position or start from the start)
-            if (this.artifactConfig.progressRestoreFile != null) {
-                indexIterator = new IndexIterator(MavenCentralRepository.RepoBaseURI, getStartingPos());
-            } else if(this.artifactConfig.skip != -1) {
-                indexIterator = new IndexIterator(MavenCentralRepository.RepoBaseURI, this.artifactConfig.skip);
+            final IndexIterator indexIterator = new IndexIterator(MavenCentralRepository.RepoBaseURI);
+
+            // Skip to starting position
+            final long startingPosition = getInitialPosition();
+            skipN(startingPosition, indexIterator);
+
+            if(this.artifactConfig.skip != -1 && this.artifactConfig.take != -1){
+                walkPaginated(this.artifactConfig.take, indexIterator);
+            } else if(this.artifactConfig.since != -1 && this.artifactConfig.until != -1){
+                walkDates(this.artifactConfig.since, this.artifactConfig.until, indexIterator);
             } else {
-                indexIterator = new IndexIterator(MavenCentralRepository.RepoBaseURI);
+                walkAllIndexes(indexIterator);
             }
 
-            if (resolveIndex) {
-                if (this.artifactConfig.skip != -1 && this.artifactConfig.take != -1) {
-                    walkPaginated(this.artifactConfig.take, indexIterator);
-                } else if (this.artifactConfig.since != -1 && this.artifactConfig.until != -1) {
-                    walkDates(this.artifactConfig.since, this.artifactConfig.until, indexIterator);
-                } else {
-                    walkAllIndexes(indexIterator);
-                }
-            } else if (this.artifactConfig.skip != -1 && this.artifactConfig.take != -1) {
-                lazyWalkPaginated(this.artifactConfig.take, indexIterator);
-            } else if (this.artifactConfig.since != -1 && this.artifactConfig.until != -1) {
-                lazyWalkDates(this.artifactConfig.since, this.artifactConfig.until, indexIterator);
-            } else {
-                lazyWalkAllIndexes(indexIterator);
-            }
-
-            writeLastProcessed(indexIterator.getIndex(), this.artifactConfig.progressOutputFile);
+            // Write final position only if not in multithreaded mode - otherwise Queue actor handles progress
+            if(!artifactConfig.multipleThreads) writePosition();
         } catch (IOException iox){
             throw new RuntimeException(iox);
         }
@@ -200,34 +192,45 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
      * Iterates over all indexes in the maven central index and creates an artifact with the metadata collected.
      *
      * @param indexIterator an iterator for traversing the maven central index
-     * @return a list of artifacts containing the maven central index metadata
-     * @see Artifact
-     * @see IndexInformation
+     * @return a list of artifact identifiers processed by this method
+     * @see ArtifactIdent
      * @throws IOException when there is an issue opening a file
      */
-    public List<Artifact> walkAllIndexes(IndexIterator indexIterator) throws IOException {
-        List<Artifact> artifacts = new ArrayList<>();
+    List<ArtifactIdent> walkAllIndexes(IndexIterator indexIterator) throws IOException {
+        final List<ArtifactIdent> artifactIdents = new ArrayList<>();
+        long entriesTaken = 0L;
 
         while(indexIterator.hasNext()) {
-            Artifact current = ArtifactFactory.createArtifact(indexIterator.next());
-            artifacts.add(current);
+            final IndexInformation current = indexIterator.next();
+            entriesTaken += 1L;
+            this.currentPosition += 1L;
+
             if(this.artifactConfig.outputEnabled && !resolvePom && !resolveJar) {
                 Path filePath = this.artifactConfig.outputDirectory.resolve(current.getIdent().getGroupID() + "-" + current.getIdent().getArtifactID() + "-" + current.getIdent().getVersion() + ".txt");
                 if(!Files.exists(filePath)) {
                     Files.createFile(filePath);
                 }
             }
-            processIndex(current);
-            if(indexIterator.getIndex() % this.artifactConfig.progressWriteInterval == 0)
-                writeLastProcessed(indexIterator.getIndex(), this.artifactConfig.progressOutputFile);
+
+            if(resolveIndex){
+                final Artifact artifact = ArtifactFactory.createArtifact(current);
+                processIndex(artifact);
+            } else {
+                processIndexIdentifier(current.getIdent());
+            }
+
+            artifactIdents.add(current.getIdent());
+
+            writePositionIfNeeded();
         }
 
-        if(this.artifactConfig.multipleThreads) {
-            queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
-        }
+        if(artifactConfig.multipleThreads)
+            log.info("Queued a total of {} entries for processing.", entriesTaken);
+        else
+            log.info("Processed a total of {} entries.", entriesTaken);
 
         indexIterator.closeReader();
-        return artifacts;
+        return artifactIdents;
     }
 
     /**
@@ -235,77 +238,99 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
      *
      * @param take number of artifacts from the starting point to capture
      * @param indexIterator an iterator for traversing the maven central index
-     * @return a list of artifacts containing the maven central index metadata
-     * @see Artifact
-     * @see IndexInformation
+     * @return a list of artifact identifiers processed by this method
+     * @see ArtifactIdent
      * @throws IOException when there is an issue opening a file
      */
-    public List<Artifact> walkPaginated(long take, IndexIterator indexIterator) throws IOException {
-        List<Artifact> artifacts = new ArrayList<>();
+    List<ArtifactIdent> walkPaginated(long take, IndexIterator indexIterator) throws IOException {
+        final List<ArtifactIdent> artifactIdents = new ArrayList<>();
+        long entriesTaken = 0L;
 
-        take += indexIterator.getIndex();
-        while(indexIterator.hasNext() && indexIterator.getIndex() < take) {
-            Artifact current = ArtifactFactory.createArtifact(indexIterator.next());
+        while(indexIterator.hasNext() && entriesTaken < take) {
+            final IndexInformation current = indexIterator.next();
+            entriesTaken += 1;
+            this.currentPosition += 1L;
+
             if(this.artifactConfig.outputEnabled && !resolvePom && !resolveJar) {
                 Path filePath = this.artifactConfig.outputDirectory.resolve(current.getIdent().getGroupID() + "-" + current.getIdent().getArtifactID() + "-" + current.getIdent().getVersion() + ".txt");
                 if(!Files.exists(filePath)) {
                     Files.createFile(filePath);
                 }
             }
-            artifacts.add(current);
-            processIndex(current);
-            if(indexIterator.getIndex() % this.artifactConfig.progressWriteInterval == 0)
-                writeLastProcessed(indexIterator.getIndex(), this.artifactConfig.progressOutputFile);
+
+            if(resolveIndex){
+                final Artifact artifact = ArtifactFactory.createArtifact(current);
+                processIndex(artifact);
+            } else {
+                processIndexIdentifier(current.getIdent());
+            }
+
+            artifactIdents.add(current.getIdent());
+
+            writePositionIfNeeded();
         }
 
-        if(this.artifactConfig.multipleThreads) {
-            queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
-        }
+        if(artifactConfig.multipleThreads)
+            log.info("Queued a total of {} entries for processing.", entriesTaken);
+        else
+            log.info("Processed a total of {} entries.", entriesTaken);
 
         indexIterator.closeReader();
-        return artifacts;
+        return artifactIdents;
     }
 
     /**
      * Iterates over all indexes in the maven central index.
-     * It collects a list of artifacts that are within the range of since and until.
+     * It collects a list of artifact identifiers that are within the range of since and until.
      *
      * @param since lower bound of dates of artifacts to collect
      * @param until upper bound of dates of artifacts to collect
      * @param indexIterator an iterator for traversing the maven central index
-     * @return a list of artifacts containing the maven central index metadata
-     * @see Artifact
-     * @see IndexInformation
+     * @return a list of artifact identifiers processed by this method
+     * @see ArtifactIdent
      * @throws IOException when there is an issue opening a file
      */
-    public List<Artifact> walkDates(long since, long until, IndexIterator indexIterator) throws IOException {
-        List<Artifact> artifacts = new ArrayList<>();
+    List<ArtifactIdent> walkDates(long since, long until, IndexIterator indexIterator) throws IOException {
+        final List<ArtifactIdent> artifactIdents = new ArrayList<>();
+        long entriesTaken = 0L;
 
         long currentToSince;
+
         while(indexIterator.hasNext()) {
-            IndexInformation temp = indexIterator.next();
-            currentToSince = temp.getLastModified();
+            IndexInformation current = indexIterator.next();
+            entriesTaken += 1L;
+            this.currentPosition += 1L;
+
+            currentToSince = current.getLastModified();
+
             if(currentToSince >= since && currentToSince < until) {
-                Artifact current = ArtifactFactory.createArtifact(indexIterator.next());
                 if(this.artifactConfig.outputEnabled && !resolvePom && !resolveJar) {
                     Path filePath = this.artifactConfig.outputDirectory.resolve(current.getIdent().getGroupID() + "-" + current.getIdent().getArtifactID() + "-" + current.getIdent().getVersion() + ".txt");
                     if(!Files.exists(filePath)) {
                         Files.createFile(filePath);
                     }
                 }
-                artifacts.add(current);
-                processIndex(current);
+
+                if(resolveIndex){
+                    final Artifact artifact = ArtifactFactory.createArtifact(current);
+                    processIndex(artifact);
+                } else {
+                    processIndexIdentifier(current.getIdent());
+                }
+
+                artifactIdents.add(current.getIdent());
             }
-            if(indexIterator.getIndex() % this.artifactConfig.progressWriteInterval == 0)
-                writeLastProcessed(indexIterator.getIndex(), this.artifactConfig.progressOutputFile);
+
+            writePositionIfNeeded();
         }
 
-        if(this.artifactConfig.multipleThreads) {
-            queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
-        }
+        if(artifactConfig.multipleThreads)
+            log.info("Queued a total of {} entries for processing.", entriesTaken);
+        else
+            log.info("Processed a total of {} entries.", entriesTaken);
 
         indexIterator.closeReader();
-        return artifacts;
+        return artifactIdents;
     }
 
     private void processIndexIdentifier(ArtifactIdent ident) {
@@ -320,205 +345,61 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
     }
 
     /**
-     * Iterates over all the indexes in the maven central index and just collects the identifiers
-     * @param indexIterator an iterator for traversing the maven central index
-     * @return a list of artifact identifiers
-     * @see ArtifactIdent
-     * @throws IOException when there is an issue opening a file
-     */
-    public List<ArtifactIdent> lazyWalkAllIndexes(IndexIterator indexIterator) throws IOException {
-        List<ArtifactIdent> idents = new ArrayList<>();
-        while(indexIterator.hasNext()) {
-            ArtifactIdent ident = indexIterator.next().getIdent();
-            idents.add(ident);
-            if(this.artifactConfig.outputEnabled && !resolvePom && !resolveJar) {
-                Path filePath = this.artifactConfig.outputDirectory.resolve(ident.getGroupID() + "-" + ident.getArtifactID() + "-" + ident.getVersion() + ".txt");
-                if(!Files.exists(filePath)) {
-                    Files.createFile(filePath);
-                }
-            }
-            processIndexIdentifier(ident);
-            if(indexIterator.getIndex() % this.artifactConfig.progressWriteInterval == 0)
-                writeLastProcessed(indexIterator.getIndex(), this.artifactConfig.progressOutputFile);
-        }
-
-        if(this.artifactConfig.multipleThreads) {
-            queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
-        }
-
-        indexIterator.closeReader();
-        return idents;
-    }
-
-    /**
-     * Iterates over a given number of indexes from the maven central index, and collects just the identifiers.
-     * @param take how many indexes from the starting position to traverse
-     * @param indexIterator an iterator for traversing the maven central index
-     * @return a list of artifact identifiers
-     * @see ArtifactIdent
-     * @throws IOException when there is an issue opening a file
-     */
-    public List<ArtifactIdent> lazyWalkPaginated(long take, IndexIterator indexIterator) throws IOException{
-        List<ArtifactIdent> idents = new ArrayList<>();
-
-        take += indexIterator.getIndex();
-        while(indexIterator.hasNext() && indexIterator.getIndex() < take) {
-            ArtifactIdent ident = indexIterator.next().getIdent();
-            idents.add(ident);
-            if(this.artifactConfig.outputEnabled && !resolvePom && !resolveJar) {
-                Path filePath = this.artifactConfig.outputDirectory.resolve(ident.getGroupID() + "-" + ident.getArtifactID() + "-" + ident.getVersion() + ".txt");
-                if(!Files.exists(filePath)) {
-                    Files.createFile(filePath);
-                }
-            }
-            processIndexIdentifier(ident);
-            if(indexIterator.getIndex() % this.artifactConfig.progressWriteInterval == 0)
-                writeLastProcessed(indexIterator.getIndex(), this.artifactConfig.progressOutputFile);
-        }
-
-        if(this.artifactConfig.multipleThreads) {
-            queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
-        }
-        indexIterator.closeReader();
-        return idents;
-    }
-
-    /**
-     * Iterates over all index in the maven central index.
-     * It collects a list of artifact identifiers that are within the range of since and until.
-     *
-     * @param since lower bound of dates of artifacts to collect
-     * @param until upper bound of dates of artifacts to collect
-     * @param indexIterator an iterator for traversing the maven central index
-     * @return a list of artifact identifiers within since and until
-     * @see ArtifactIdent
-     * @throws IOException when there is an issue opening a file
-     */
-    public List<ArtifactIdent> lazyWalkDates(long since, long until, IndexIterator indexIterator) throws IOException{
-        List<ArtifactIdent> idents = new ArrayList<>();
-
-        long currentToSince;
-        while(indexIterator.hasNext()) {
-            IndexInformation temp = indexIterator.next();
-            currentToSince = temp.getLastModified();
-            if(currentToSince >= since && currentToSince < until) {
-                ArtifactIdent ident = temp.getIdent();
-                idents.add(ident);
-                if(this.artifactConfig.outputEnabled && !resolvePom && !resolveJar) {
-                    Path filePath = this.artifactConfig.outputDirectory.resolve(ident.getGroupID() + "-" + ident.getArtifactID() + "-" + ident.getVersion() + ".txt");
-                    if(!Files.exists(filePath)) {
-                        Files.createFile(filePath);
-                    }
-                }
-                processIndexIdentifier(ident);
-            }
-            if(indexIterator.getIndex() % this.artifactConfig.progressWriteInterval == 0)
-                writeLastProcessed(indexIterator.getIndex(), this.artifactConfig.progressOutputFile);
-        }
-
-        if(this.artifactConfig.multipleThreads) {
-            queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
-        }
-
-        indexIterator.closeReader();
-
-        return idents;
-    }
-
-    private void writeLastProcessed(long lastIndexProcessed, Path name) throws IOException {
-        BufferedWriter writer = new BufferedWriter(new FileWriter(name.toFile()));
-        writer.write(String.valueOf(lastIndexProcessed));
-        writer.close();
-    }
-
-    /**
      * Reads in identifiers from a file, using the configuration passed into it.
      *
      * @return a list of identifiers collected from the file
      */
-    public List<ArtifactIdent> readIdentsIn() {
-        Path toCoordinates = this.artifactConfig.inputListFile;
+    List<ArtifactIdent> processArtifactsFromInputFile() {
+        final Iterator<ArtifactIdent> fileIterator = new FileBasedArtifactIterator(this.artifactConfig.inputListFile);
 
-        BufferedReader coordinatesReader;
-        List<ArtifactIdent> identifiers = new ArrayList<>();
-        try{
-            coordinatesReader = new BufferedReader(new FileReader(toCoordinates.toFile()));
-            String line = coordinatesReader.readLine();
+        // Restore from progress file if available
+        if(this.artifactConfig.progressRestoreFile != null){
+            long lastProgress = getStartingPos();
+            log.info("Restoring previous progress from file (position {})", lastProgress);
 
-            int i = -1;
-            if(this.artifactConfig.skip != -1 && this.artifactConfig.take != -1) {
-                int toSkip = 0;
-                int curTake = 0;
-                while(line != null && curTake < this.artifactConfig.take) {
-                    if(toSkip >= this.artifactConfig.skip) {
-                        String[] parts = line.split(":");
-                        if(parts.length == 3) {
-                            ArtifactIdent current = new ArtifactIdent(parts[0], parts[1], parts[2]);
-                            identifiers.add(current);
-                            processIndexIdentifier(current);
-                            curTake++;
-                        } else {
-                            log.error("unable to process Artifact Identifier {} at position {}", line, i);
-                        }
-                    }
-                    line = coordinatesReader.readLine();
-                    toSkip++;
-                    i++;
-                }
-            } else if(this.artifactConfig.progressRestoreFile != null) {
-                long start = getStartingPos();
-                int curPos = 0;
-                while(line != null) {
-                    if(curPos >= start) {
-                        String[] parts = line.split(":");
-                        if(parts.length == 3) {
-                            ArtifactIdent current = new ArtifactIdent(parts[0], parts[1], parts[2]);
-                            identifiers.add(current);
-                            processIndexIdentifier(current);
-                        } else {
-                            log.error("unable to process Artifact Identifier {} at position {}", line, i);
-                        }
-                    }
-                    line = coordinatesReader.readLine();
-                    curPos++;
-                    i++;
-                }
-            } else {
-                while(line != null) {
-                    String[] parts = line.split(":");
-                    if(parts.length == 3) {
-                        ArtifactIdent current = new ArtifactIdent(parts[0], parts[1], parts[2]);
-                        identifiers.add(current);
-                        processIndexIdentifier(current);
-                    } else {
-                        log.error("unable to process Artifact Identifier {} at position {}", line, i);
-                    }
-                    line = coordinatesReader.readLine();
-                    i++;
-                }
-            }
-
-            if(this.artifactConfig.multipleThreads) {
-                queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
-            }
-
-            writeLastProcessed(i, this.artifactConfig.progressOutputFile);
-            coordinatesReader.close();
-        } catch(IOException e) {
-            throw new RuntimeException(e);
+            this.skipN(lastProgress, fileIterator);
+        } else if(this.artifactConfig.skip > 0){
+            // Skip configured values only if we did not restore from progress file
+            log.info("Skipping {} entries from file", artifactConfig.skip);
+            skipN(this.artifactConfig.skip, fileIterator);
         }
+
+        // Warn if after skipping there are no entries left
+        if(!fileIterator.hasNext())
+            log.warn("No more contents left to process in input file: {}", this.artifactConfig.inputListFile);
+
+        final List<ArtifactIdent> identifiers = new ArrayList<>();
+        final boolean takeLimited = this.artifactConfig.take >= 0;
+
+        long entriesTaken = 0L;
+        while ((!takeLimited || entriesTaken < this.artifactConfig.take) && fileIterator.hasNext()) {
+
+            ArtifactIdent current = null;
+
+            try { current = fileIterator.next(); } catch (Exception x){
+                log.error("Malformed GAV triple in input file {} line {}", this.artifactConfig.inputListFile,
+                        this.currentPosition);
+            }
+
+            this.currentPosition += 1L;
+            entriesTaken += 1L;
+
+            if(current != null){
+                identifiers.add(current);
+                processIndexIdentifier(current);
+            }
+        }
+
+        if(artifactConfig.multipleThreads){
+            log.info("Queued a total of {} entries for processing from file {}.", entriesTaken, this.artifactConfig.inputListFile);
+        } else {
+            log.info("Processed a total of {} entries from file {}.", entriesTaken, this.artifactConfig.inputListFile);
+
+            // Write position one final time - in multithreaded mode the queue worker will take care of this
+            writePosition();
+        }
+
         return identifiers;
-    }
-
-    private long getStartingPos() {
-        BufferedReader indexReader;
-        try {
-            indexReader = new BufferedReader(new FileReader(this.artifactConfig.progressRestoreFile.toFile()));
-            String line = indexReader.readLine();
-            return Integer.parseInt(line);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     /**
@@ -533,5 +414,44 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
         } else if(resolveJar) {
             resolverFactory.runJar(identifier);
         }
+    }
+
+    private long getInitialPosition() {
+        if(artifactConfig.progressRestoreFile != null) return getStartingPos();
+        else if(artifactConfig.skip > 0) return artifactConfig.skip;
+        else return 0L;
+    }
+
+    private long getStartingPos() {
+        BufferedReader indexReader;
+        try {
+            indexReader = new BufferedReader(new FileReader(this.artifactConfig.progressRestoreFile.toFile()));
+            String line = indexReader.readLine();
+            return Integer.parseInt(line);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void skipN(long N, Iterator<?> it){
+        for(int i = 0; i < N && it.hasNext(); i++){
+            it.next();
+            this.currentPosition += 1L;
+        }
+    }
+
+    private void writePositionIfNeeded(){
+        if(!this.artifactConfig.multipleThreads &&
+                this.currentPosition - this.lastPositionSaved > artifactConfig.progressWriteInterval){
+            writePosition();
+        }
+    }
+
+    private void writePosition() {
+        try(BufferedWriter writer = Files.newBufferedWriter(this.artifactConfig.progressOutputFile)) {
+            writer.write(Long.toString(this.currentPosition));
+        } catch(IOException ignored) {}
+
+        this.lastPositionSaved = currentPosition;
     }
 }

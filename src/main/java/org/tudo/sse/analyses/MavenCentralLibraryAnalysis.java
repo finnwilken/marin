@@ -67,7 +67,7 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
         // iterator will produce strings of form <GroupID>:<ArtifactID>.
         Iterator<String> gaIterator = getGaIterator();
 
-        // Restore previous progress
+        // We first start by restoring progress if possible
         if(config.progressRestoreFile != null){
             final long startingPosition = getProgressFromRestoreFile();
             log.info("Restoring previous progress (position {})", startingPosition);
@@ -78,10 +78,11 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
                 } else gaIterator.next();
                 currentPosition += 1L;
             }
-        }
-
-        // If there are values to skip, we skip them manually
-        if(config.skip > 0){
+            // Notify users that skip will not be applied
+            if(config.skip > 0)
+                log.info("Not applying skip value because progress was restored from previous run");
+        } else if(config.skip > 0){
+            // We only apply a skip if we did not restore previous progress
             log.info("Skipping {} library names", config.skip);
             for(int i = 0; i < config.skip; i++){
                 if(!gaIterator.hasNext()){

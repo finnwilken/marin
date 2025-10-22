@@ -17,7 +17,6 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * This class represents the processing queue that resolves jobs and sends them to different threads.
  * The size of the jobs and threads are determined by the configuration set in CliInformation.
- * @see org.tudo.sse.CliInformation
  */
 public class QueueActor extends AbstractActor {
 
@@ -71,27 +70,6 @@ public class QueueActor extends AbstractActor {
         return ReceiveBuilder.create()
                 .match(ProcessIdentifierMessage.class, this::forwardToResolvers)
                 .match(ProcessLibraryMessage.class, this::forwardToResolvers)
-                .match(String.class, message -> {
-                    synchronized (jobQueue){
-                        if(!jobQueue.isEmpty()) {
-                            getSender().tell(jobQueue.peek(), getSelf());
-                            jobQueue.remove();
-                            if(jobQueue.size() % 10 == 0) log.trace("Distributed a job, queue size " + jobQueue.size());
-                        } else {
-                            synchronized(curNumResolvers) {
-                                if(indexFinished && curNumResolvers.get() == 1) {
-                                    log.trace("Shutting down system");
-                                    system.terminate();
-                                } else {
-                                    log.trace("Killing a worker thread");
-                                    getSender().tell(PoisonPill.getInstance(), getSelf());
-                                    curNumResolvers.decrementAndGet();
-                                }
-                            }
-                        }
-                    }
-
-                })
                 .match(WorkItemFinishedMessage.class, workItemFinishedMessage -> {
                     // Track completion of work items
                     workItemsCompleted.incrementAndGet();
@@ -102,7 +80,7 @@ public class QueueActor extends AbstractActor {
                     synchronized (jobQueue){
                         if(!jobQueue.isEmpty()) {
                             getSender().tell(jobQueue.remove(), getSelf());
-                            if(jobQueue.size() % 10 == 0) log.trace("Distributed a job, queue size " + jobQueue.size());
+                            if(jobQueue.size() % 10 == 0) log.trace("Distributed a job, queue size {}", jobQueue.size());
                         } else {
                             synchronized(curNumResolvers) {
                                 if(indexFinished && curNumResolvers.get() == 1) {
