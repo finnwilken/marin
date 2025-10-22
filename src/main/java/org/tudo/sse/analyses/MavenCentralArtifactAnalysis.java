@@ -15,6 +15,7 @@ import org.tudo.sse.resolution.ResolverFactory;
 import org.tudo.sse.utils.ArtifactConfigParser;
 import org.tudo.sse.utils.IndexIterator;
 import org.tudo.sse.multithreading.QueueActor;
+import org.tudo.sse.utils.MavenCentralRepository;
 
 import java.io.*;
 import java.net.URI;
@@ -29,34 +30,11 @@ import java.util.Map;
  * The MavenCentralAnalysis enables analysis of artifacts on the maven central repository for jobs of any size.
  * Takes in cli to be configured to the specific job desired.
  */
-public abstract class MavenCentralArtifactAnalysis {
+public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis {
 
     private ArtifactConfigParser.ArtifactConfig artifactConfig;
     private ActorRef queueActorRef;
     private ResolverFactory resolverFactory;
-
-    /**
-     * Defines whether this analysis requires artifacts to have index information annotated.
-     */
-    protected final boolean resolveIndex;
-
-    /**
-     * Defines whether this analysis requires artifacts to have pom information annotated.
-     */
-    protected final boolean resolvePom;
-
-    /**
-     * Defines whether this analysis requires artifacts to have resolved transitive pom information.
-     */
-    protected final boolean processTransitives;
-
-    /**
-     * Defines whether this analysis requires artifacts to have jar information annotated.
-     */
-    protected final boolean resolveJar;
-
-
-    private static final Logger log = LogManager.getLogger(MavenCentralArtifactAnalysis.class);
 
     /**
      * Creates a new Maven Central Analysis with the given configuration options.
@@ -71,17 +49,8 @@ public abstract class MavenCentralArtifactAnalysis {
                                            boolean requiresPom,
                                            boolean requiresTransitives,
                                            boolean requiresJar)  {
+        super(requiresIndex, requiresPom, requiresTransitives, requiresJar);
 
-        if(!requiresIndex && !requiresPom && !requiresTransitives && !requiresJar){
-            log.warn("Potential misconfiguration - no data sources (index, POM, JAR) are required by this analysis");
-        } else if(requiresTransitives && !requiresPom){
-            log.warn("Potential misconfiguration - analysis requires transitive information but no POM information. " +
-                    "POM information will also be collected to provide transitive information.");
-        }
-        resolveIndex = requiresIndex;
-        resolvePom = requiresPom || requiresTransitives; // Cannot have transitive information without POM information
-        processTransitives = requiresTransitives;
-        resolveJar = requiresJar;
         // Initialize with default config, update later
         artifactConfig = new ArtifactConfigParser.ArtifactConfig();
     }
@@ -137,11 +106,9 @@ public abstract class MavenCentralArtifactAnalysis {
      *  There's a single-threaded implementation contained in this class, as well as a multithreaded one called here but defined in different actor classes.
      *
      * @param args cli passed to the program to configure the run
-     * @return A map of all artifacts collected during the run
-     * @throws URISyntaxException when there is an issue with the url built
-     * @throws IOException when there is an issue opening a file
      */
-    public final Map<ArtifactIdent, Artifact> runAnalysis(String[] args) throws URISyntaxException, IOException {
+    @Override
+    public final void runAnalysis(String[] args)  {
         // Obtain CLI arguments
         try {
             this.artifactConfig = new ArtifactConfigParser().parseArtifactConfig(args);
@@ -157,8 +124,8 @@ public abstract class MavenCentralArtifactAnalysis {
         }
 
         if(this.artifactConfig.multipleThreads) {
-            ActorSystem system = ActorSystem.create("my-system");
-            queueActorRef = system.actorOf(QueueActor.props(this.artifactConfig.threadCount, system, 0,0, null), "queueActor");
+            final ActorSystem system = ActorSystem.create("marin-actors");
+            queueActorRef = system.actorOf(QueueActor.props(this.artifactConfig.threadCount, system, 0, artifactConfig.progressWriteInterval, artifactConfig.progressOutputFile), "queueActor");
 
             if(this.artifactConfig.inputListFile == null) {
                 indexProcessor();
@@ -169,7 +136,7 @@ public abstract class MavenCentralArtifactAnalysis {
             try {
                 system.getWhenTerminated().toCompletableFuture().get();
             } catch (Exception e) {
-                e.printStackTrace();
+                log.warn("Failed to close actor system", e);
             }
         } else {
             if(this.artifactConfig.inputListFile == null) {
@@ -178,47 +145,46 @@ public abstract class MavenCentralArtifactAnalysis {
                 readIdentsIn();
             }
         }
-
-        return ArtifactFactory.artifacts;
     }
 
     /**
      * Handles walking the maven central index, choosing how to do so based on the configuration.
-     *
-     * @throws URISyntaxException when there is an issue with the url built
-     * @throws IOException        when there is an issue opening a file
      * @see ArtifactIdent
      */
-    public void indexProcessor() throws URISyntaxException, IOException {
-        String base = "https://repo1.maven.org/maven2/";
+    public void indexProcessor() {
         IndexIterator indexIterator;
 
-        //set up indexIterator here (skip to a position or start from the start)
-        if (this.artifactConfig.progressRestoreFile != null) {
-            indexIterator = new IndexIterator(new URI(base), getStartingPos());
-        } else if(this.artifactConfig.skip != -1) {
-            indexIterator = new IndexIterator(new URI(base), this.artifactConfig.skip);
-        } else {
-            indexIterator = new IndexIterator(new URI(base));
-        }
-
-        if (resolveIndex) {
-            if (this.artifactConfig.skip != -1 && this.artifactConfig.take != -1) {
-                walkPaginated(this.artifactConfig.take, indexIterator);
-            } else if (this.artifactConfig.since != -1 && this.artifactConfig.until != -1) {
-                walkDates(this.artifactConfig.since, this.artifactConfig.until, indexIterator);
+        try {
+            //set up indexIterator here (skip to a position or start from the start)
+            if (this.artifactConfig.progressRestoreFile != null) {
+                indexIterator = new IndexIterator(MavenCentralRepository.RepoBaseURI, getStartingPos());
+            } else if(this.artifactConfig.skip != -1) {
+                indexIterator = new IndexIterator(MavenCentralRepository.RepoBaseURI, this.artifactConfig.skip);
             } else {
-                walkAllIndexes(indexIterator);
+                indexIterator = new IndexIterator(MavenCentralRepository.RepoBaseURI);
             }
-        } else if (this.artifactConfig.skip != -1 && this.artifactConfig.take != -1) {
-            lazyWalkPaginated(this.artifactConfig.take, indexIterator);
-        } else if (this.artifactConfig.since != -1 && this.artifactConfig.until != -1) {
-            lazyWalkDates(this.artifactConfig.since, this.artifactConfig.until, indexIterator);
-        } else {
-            lazyWalkAllIndexes(indexIterator);
+
+            if (resolveIndex) {
+                if (this.artifactConfig.skip != -1 && this.artifactConfig.take != -1) {
+                    walkPaginated(this.artifactConfig.take, indexIterator);
+                } else if (this.artifactConfig.since != -1 && this.artifactConfig.until != -1) {
+                    walkDates(this.artifactConfig.since, this.artifactConfig.until, indexIterator);
+                } else {
+                    walkAllIndexes(indexIterator);
+                }
+            } else if (this.artifactConfig.skip != -1 && this.artifactConfig.take != -1) {
+                lazyWalkPaginated(this.artifactConfig.take, indexIterator);
+            } else if (this.artifactConfig.since != -1 && this.artifactConfig.until != -1) {
+                lazyWalkDates(this.artifactConfig.since, this.artifactConfig.until, indexIterator);
+            } else {
+                lazyWalkAllIndexes(indexIterator);
+            }
+
+            writeLastProcessed(indexIterator.getIndex(), this.artifactConfig.progressOutputFile);
+        } catch (IOException iox){
+            throw new RuntimeException(iox);
         }
 
-        writeLastProcessed(indexIterator.getIndex(), this.artifactConfig.progressOutputFile);
     }
 
     private void processIndex(Artifact current) {

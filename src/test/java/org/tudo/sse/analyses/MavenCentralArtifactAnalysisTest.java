@@ -205,18 +205,14 @@ class MavenCentralArtifactAnalysisTest {
 
         int i = 0;
         for(String[] arg : cliInputs) {
-            try {
-                analysisUnderTest.runAnalysis(arg);
+            analysisUnderTest.runAnalysis(arg);
 
-                Path indexPath = analysisUnderTest.getSetupInfo().progressOutputFile;
-                assert(indexPath != null);
-                long ending = getEndingIndex(indexPath);
+            Path indexPath = analysisUnderTest.getSetupInfo().progressOutputFile;
+            assert(indexPath != null);
+            long ending = getEndingIndex(indexPath);
 
-                assertEquals(expectedEndings[i], ending);
+            assertEquals(expectedEndings[i], ending);
 
-            } catch (URISyntaxException | IOException e) {
-                throw new RuntimeException(e);
-            }
             i++;
         }
     }
@@ -277,18 +273,22 @@ class MavenCentralArtifactAnalysisTest {
         multiArgs.add(new String[]{"--threads", "5", "--inputs", "src/main/resources/coordinates.txt"});
 
         for(int i = 0; i < singleArgs.size(); i++) {
-            try {
-                MavenCentralArtifactAnalysis tester = MavenCentralAnalysisFactory.buildEmptyAnalysisWithPomRequirement();
-                Map<ArtifactIdent, Artifact> singleResult = tester.runAnalysis(singleArgs.get(i));
-                Map<ArtifactIdent, Artifact> multiResult = tester.runAnalysis(multiArgs.get(i));
-                assertEquals(singleResult.size(), multiResult.size());
-                for(Map.Entry<ArtifactIdent, Artifact> entry : singleResult.entrySet()) {
-                    assert(multiResult.containsKey(entry.getKey()));
-                }
-            } catch(URISyntaxException | IOException e) {
-                fail("Threw an exception");
-            }
 
+            MavenCentralArtifactAnalysis tester = MavenCentralAnalysisFactory.buildEmptyAnalysisWithPomRequirement();
+
+            tester.runAnalysis(singleArgs.get(i));
+            Set<ArtifactIdent> singleResult = ArtifactFactory.artifacts.keySet();
+            cleanup();
+
+            tester.runAnalysis(multiArgs.get(i));
+            Set<ArtifactIdent> multiResult = ArtifactFactory.artifacts.keySet();
+            cleanup();
+
+            assertEquals(singleResult.size(), multiResult.size());
+
+            for(ArtifactIdent single : singleResult) {
+                assert(multiResult.contains(single));
+            }
         }
     }
 

@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 public final class MavenCentralRepository {
 
     public static final String RepoBasePath = "https://repo1.maven.org/maven2/";
+    public static final URI RepoBaseURI = URI.create(RepoBasePath);
 
     private static MavenCentralRepository theInstance = null;
 
