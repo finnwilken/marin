@@ -2,16 +2,25 @@ package org.tudo.sse;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import org.opalj.log.GlobalLogContext$;
+import org.opalj.log.OPALLogger;
 import org.tudo.sse.model.*;
 import org.tudo.sse.model.index.IndexInformation;
 import org.tudo.sse.model.jar.JarInformation;
 import org.tudo.sse.model.pom.PomInformation;
+import org.tudo.sse.utils.MarinOpalLogger;
 
 /**
  * The ArtifactFactory handles the creation and storage of artifacts resolved.
  * Using a map double resolutions are avoided and faster retrievals are possible.
  */
 public final class ArtifactFactory {
+
+    static {
+        // Use global OPAL Logger - will only forward OPAL messages with level error or fatal
+        OPALLogger.updateLogger(GlobalLogContext$.MODULE$, MarinOpalLogger.getGlobalLogger());
+    }
 
     private ArtifactFactory() {}
 

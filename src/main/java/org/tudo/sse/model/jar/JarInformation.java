@@ -3,15 +3,18 @@ package org.tudo.sse.model.jar;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opalj.br.analyses.Project;
+import org.opalj.br.package$;
 import org.opalj.br.reader.Java17Framework$;
 import org.opalj.br.reader.Java17LibraryFramework;
 import org.opalj.br.reader.Java17LibraryFramework$;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.ArtifactInformation;
 import org.tudo.sse.resolution.FileNotFoundException;
+import org.tudo.sse.utils.MarinOpalLogger;
 import org.tudo.sse.utils.MavenCentralRepository;
 import scala.Tuple2;
 import scala.jdk.CollectionConverters;
+import scala.runtime.BoxedUnit;
 
 import java.io.File;
 import java.io.IOException;
@@ -207,8 +210,23 @@ public class JarInformation extends ArtifactInformation {
      *           really need them.
      */
     public Project<String> getOpalProject() throws IOException {
+        return getOpalProject(MarinOpalLogger.newInfoLogger(LogManager.getLogger("[OPAL-Project]")));
+    }
+
+    /**
+     * Retrieves all class files for the JAR referenced by this ArtifactInformation, and uses them to initialize an
+     * OPAL project instance. This instance can be used to conduct complex static program analyses.
+     * @return The OPAL project instance, or null if no JAR file was found
+     * @param projectLogger A custom logger instance to configure the amount of output that is produced by OPAL.
+     * @throws IOException If reading the JAR file fails
+     * @implNote OPAL projects are not designed to be used in large scale analyses. Over time, OPAL's internal caches
+     *           will continue to claim heap space that is never freed, so eventually the program will crash with an
+     *           OutOfMemory error. There is currently no good way to avoid this, so use project instances only if you
+     *           really need them.
+     */
+    public Project<String> getOpalProject(MarinOpalLogger projectLogger) throws IOException {
         try(JarInputStream jarStream = getJarInputStream()){
-            return Project.apply(Java17Framework$.MODULE$.ClassFiles(() -> jarStream).map( t -> new Tuple2<>((org.opalj.br.ClassFile)t._1, t._2)));
+            return Project.apply(Java17Framework$.MODULE$.ClassFiles(() -> jarStream).map( t -> new Tuple2<>((org.opalj.br.ClassFile)t._1, t._2)), projectLogger);
         } catch(FileNotFoundException fnfx){
             log.error("No JAR file found for {}", ident.getCoordinates(), fnfx);
             return null;
@@ -245,6 +263,28 @@ public class JarInformation extends ArtifactInformation {
      *                     enabled).
      */
     public Project<String> getOpalProject(Set<ArtifactIdent> dependencies, boolean fullyLoadLibraries, boolean breakOnFailure) throws IOException {
+        return getOpalProject(dependencies, fullyLoadLibraries, breakOnFailure,
+                MarinOpalLogger.newInfoLogger(LogManager.getLogger("[OPAL-Project]")));
+    }
+
+    /**
+     * Initializes an OPAL project instance for the current JAR and the given set of dependencies. This project instance
+     * can be used to conduct complex, static whole-program analyses.
+     * @param dependencies The transitive set of dependencies to use. Can be obtained using the PomInformation instance
+     *                     for this artifact
+     * @param fullyLoadLibraries Whether to fully load the dependency's class file contents. If set to false, only their
+     *                           interface definitions (class names, method signatures) are loaded, not their actual
+     *                           content.
+     * @param breakOnFailure If set to true, any IO exception when loading dependencies interrupts the method execution
+     *                       and throws the exception up to the calling method. If set to false, dependencies will be
+     *                       loaded in a best-effort fashion, and errors will only be logged to the console.
+     * @param projectLogger A custom logger instance to configure the amount of output that is produced by OPAL.
+     * @return The OPAL project instance, or null if no main project JAR was found
+     * @throws IOException If an IO error occurs while loading the main JAR, or the dependencies (when breakOnFailure is
+     *                     enabled).
+     */
+    public Project<String> getOpalProject(Set<ArtifactIdent> dependencies, boolean fullyLoadLibraries,
+                                          boolean breakOnFailure, MarinOpalLogger projectLogger) throws IOException {
         List<Tuple2<org.opalj.br.ClassFile, String>> allLibraryClasses = new ArrayList<>();
 
         for(ArtifactIdent dependency : dependencies){
@@ -267,7 +307,12 @@ public class JarInformation extends ArtifactInformation {
         }
 
         return Project.apply(CollectionConverters.ListHasAsScala(allProjectClasses).asScala().toSeq(),
-                CollectionConverters.ListHasAsScala(allLibraryClasses).asScala().toSeq(), !fullyLoadLibraries);
+                CollectionConverters.ListHasAsScala(allLibraryClasses).asScala().toSeq(),
+                !fullyLoadLibraries,
+                CollectionConverters.ListHasAsScala(new ArrayList<org.opalj.br.ClassFile>()).asScala().toIterable(),
+                (a, b) -> BoxedUnit.UNIT,
+                package$.MODULE$.BaseConfig(),
+                projectLogger);
     }
 
     private List<org.opalj.br.ClassFile> getOpalClassFileRepresentations(ArtifactIdent ident) throws IOException {

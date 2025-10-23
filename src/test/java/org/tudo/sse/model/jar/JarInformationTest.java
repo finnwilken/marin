@@ -1,11 +1,15 @@
 package org.tudo.sse.model.jar;
 
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.opalj.br.ClassFile;
 import org.opalj.br.ClassType;
 import org.opalj.br.analyses.Project;
+import org.opalj.log.GlobalLogContext$;
+import org.opalj.log.OPALLogger;
 import org.tudo.sse.model.ArtifactIdent;
+import org.tudo.sse.utils.MarinOpalLogger;
 
 import java.io.File;
 import java.io.InputStream;
@@ -22,6 +26,12 @@ public class JarInformationTest {
     private final long expectedFileSizeBytes = 79347L;
     private final ArtifactIdent ident = new ArtifactIdent("eu.sse-labs", "marin", "1.0.0");
     private final JarInformation jarInfo = new JarInformation(ident);
+
+    @BeforeAll
+    static void setup(){
+        // Use global OPAL Logger - will only forward OPAL messages with level error or fatal
+        OPALLogger.updateLogger(GlobalLogContext$.MODULE$, MarinOpalLogger.getGlobalLogger());
+    }
 
     @Test
     @DisplayName("JAR information should be able to download file to temp directory")
