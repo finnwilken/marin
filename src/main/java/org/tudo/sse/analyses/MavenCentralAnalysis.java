@@ -2,6 +2,9 @@ package org.tudo.sse.analyses;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.opalj.log.GlobalLogContext$;
+import org.opalj.log.OPALLogger;
+import org.tudo.sse.utils.MarinOpalLogger;
 
 abstract class MavenCentralAnalysis {
 
@@ -50,6 +53,9 @@ abstract class MavenCentralAnalysis {
             log.warn("Potential misconfiguration - analysis requires transitive information but no POM information. " +
                     "POM information will also be collected to provide transitive information.");
         }
+
+        // Use global OPAL Logger - will only forward OPAL messages with level error or fatal
+        OPALLogger.updateLogger(GlobalLogContext$.MODULE$, MarinOpalLogger.getGlobalLogger());
 
         resolveIndex = requiresIndex;
         resolvePom = requiresPom || requiresTransitives; // Cannot have transitive information without POM information
