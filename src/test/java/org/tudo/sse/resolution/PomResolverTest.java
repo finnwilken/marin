@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.tudo.sse.IndexWalker;
 import org.tudo.sse.model.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.io.*;
@@ -59,7 +60,7 @@ class PomResolverTest {
         for(String input : inputs) {
             RawPomFeatures current = null;
             try {
-                current = pomResolver.processRawPomFeatures(IOUtils.toInputStream(input), null);
+                current = pomResolver.processRawPomFeatures(IOUtils.toInputStream(input, StandardCharsets.UTF_8), null);
             } catch (PomResolutionException e) {
                 fail(e);
             }

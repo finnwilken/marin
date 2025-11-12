@@ -105,6 +105,14 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
         if(config.take >= 0)
             log.info("Taking {} library names", config.take);
 
+        // Invoke the beforeRunStart lifecycle hook
+        try {
+            this.beforeRunStart();
+        } catch (Exception x){
+            log.error("Unexpected exception in analysis lifecycle hook beforeRunStart", x);
+            return;
+        }
+
         // If specified, we only take the configured amount of entries. If not, we process as long as the iterator
         // provides new entries
         while((config.take < 0 || entriesTaken < config.take) && gaIterator.hasNext()){
@@ -138,7 +146,52 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
                 system.getWhenTerminated().toCompletableFuture().get();
             } catch (Exception x) { log.warn("Error closing actor system: {}", x.getMessage());}
         }
+
+        // Invoke the afterRunEnd lifecycle hook
+        try {
+            this.afterRunEnd();
+        } catch(Exception x){
+            log.error("Unexpected exception in analysis lifecycle hook afterRunEnd", x);
+        }
     }
+
+    /**
+     * Analysis lifecycle hook that is executed before a library is being processed, i.e., before any releases are
+     * discovered.
+     *
+     * @implNote This method may be called concurrently by multiple threads if the analysis uses parallel execution
+     *
+     * @param groupId The library's group ID
+     * @param artifactId The library's artifact ID
+     */
+    protected void beforeLibraryStart(String groupId, String artifactId) {
+        log.debug("Start processing library {}:{}", groupId, artifactId);
+    }
+
+    /**
+     * Analysis lifecycle hook that is executed after a library has been processed, i.e., after all releases have been
+     * discovered and the analysis implementation has been executed.
+     *
+     * @implNote This method may be called concurrently by multiple threads if the analysis uses parallel execution
+     *
+     * @param groupId The library's group ID
+     * @param artifactId The library's artifact ID
+     * @param artifacts The set of artifacts for the given library
+     */
+    protected void afterLibraryEnd(String groupId, String artifactId, List<Artifact> artifacts) {
+        log.debug("Finished processing {} artifacts for library {}:{}", artifacts.size(), groupId, artifactId);
+    }
+
+    /**
+     * Analysis lifecycle hook that is executed when the analysis failed to obtain a version list for a given library.
+     *
+     * @implNote This method may be called concurrently by multiple threads if the analysis uses parallel execution
+     *
+     * @param groupId The library's group ID
+     * @param artifactId The library's artifact ID
+     * @param cause The exception that caused the failure
+     */
+    protected void onVersionListError(String groupId, String artifactId, Exception cause){}
 
     /**
      * Main analysis implementation. Defines how a single library shall be analyzed. All artifacts for a given
@@ -168,6 +221,12 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
     }
 
     private Void process(String ga, String groupId, String artifactId){
+
+        try { this.beforeLibraryStart(groupId, artifactId); }
+        catch(Exception x){
+            log.error("Unexpected exception in analysis lifecycle hook beforeLibraryStart for library {}, {}", groupId, artifactId, x);
+        }
+
         List<ArtifactIdent> identifiers = getReleaseIdentifiers(groupId, artifactId);
 
         // Abort if we find no releases, error has already been logged at this point
@@ -189,6 +248,11 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
             log.error("Unknown error in analysis implementation", x);
         }
 
+        try { this.afterLibraryEnd(groupId, artifactId, libraryArtifacts); }
+        catch(Exception x){
+            log.error("Unexpected exception in analysis lifecycle hook afterLibraryEnd for library {}, {}", groupId, artifactId, x);
+        }
+
         return null;
     }
 
@@ -202,6 +266,12 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
             return identifiers;
         } catch (Exception x) {
             log.warn("Failed to obtain version list for library {}:{}", groupId, artifactId, x);
+
+            try { this.onVersionListError(groupId, artifactId, x); }
+            catch(Exception inner) {
+                log.warn("Unexcepted exception in analysis lifecycle hook onVersionListError for library {}:{}, {}", groupId, artifactId, x);
+            }
+
             return null;
         }
     }
