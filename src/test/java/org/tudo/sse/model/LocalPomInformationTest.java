@@ -6,10 +6,12 @@ import org.junit.jupiter.api.Test;
 import org.tudo.sse.model.pom.Dependency;
 import org.tudo.sse.model.pom.LocalPomInformation;
 import org.tudo.sse.model.pom.RawPomFeatures;
+import org.tudo.sse.resolution.LocalPomInformationFactory;
 import org.tudo.sse.resolution.PomResolver;
 import org.tudo.sse.resolution.releases.IReleaseListProvider;
 
 import java.io.*;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -17,6 +19,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@SuppressWarnings("unchecked")
 class LocalPomInformationTest {
 
     final Gson gson = new Gson();
@@ -30,7 +33,7 @@ class LocalPomInformationTest {
 
     final IReleaseListProvider mockProvider = new IReleaseListProvider() {
 
-        private Map<String, List<String>> releaseListData = new HashMap<>();
+        private final Map<String, List<String>> releaseListData = new HashMap<>();
 
         private void buildMap(){
             for(Map<String, Object> entry : (List<Map<String, Object>>)json.get("versionLists")){
@@ -66,11 +69,11 @@ class LocalPomInformationTest {
         PomResolver resolver = new PomResolver(true, mockProvider);
 
         try {
-            tests.add(new LocalPomInformation("src/test/resources/localPom.xml", resolver));
-            tests.add(new LocalPomInformation(new File("src/test/resources/localPom.xml"), resolver));
-            tests.add(new LocalPomInformation(new FileInputStream("src/test/resources/localPom.xml"), resolver));
-        } catch (FileNotFoundException e) {
-            throw new RuntimeException(e);
+            tests.add(LocalPomInformationFactory.loadLocalPom(Path.of("src/test/resources/localPom.xml"), true, resolver));
+            tests.add(LocalPomInformationFactory.loadLocalPom(new File("src/test/resources/localPom.xml"), true, resolver));
+            tests.add(LocalPomInformationFactory.loadLocalPom(new FileInputStream("src/test/resources/localPom.xml"), true, resolver));
+        } catch (IOException iox) {
+            throw new RuntimeException(iox);
         }
 
         testFeatureExtraction(tests);
@@ -80,9 +83,12 @@ class LocalPomInformationTest {
     @Test
     void localPomException() {
         PomResolver resolver = new PomResolver(true, mockProvider);
-        assertThrows(RuntimeException.class, () -> new LocalPomInformation("src/test/resources/brokenlocalPom.xml", resolver));
-        assertThrows(RuntimeException.class, () -> new LocalPomInformation(new File("src/test/resources/brokenlocalPom.xml"), resolver));
-        assertThrows(RuntimeException.class, () -> new LocalPomInformation(new FileInputStream("src/test/resources/brokenlocalPom.xml"), resolver));
+        assertThrows(RuntimeException.class, () ->
+                LocalPomInformationFactory.loadLocalPom(Path.of("src/test/resources/brokenlocalPom.xml"), true, resolver));
+        assertThrows(RuntimeException.class, () ->
+                LocalPomInformationFactory.loadLocalPom(new File("src/test/resources/brokenlocalPom.xml"), true, resolver));
+        assertThrows(RuntimeException.class, () ->
+                LocalPomInformationFactory.loadLocalPom(new FileInputStream("src/test/resources/brokenlocalPom.xml"), true, resolver));
     }
 
     void testFeatureExtraction(List<LocalPomInformation> tests) {

@@ -1,5 +1,8 @@
 package org.tudo.sse.utils;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import org.apache.maven.index.reader.ChunkReader;
 import org.apache.maven.index.reader.IndexReader;
 
@@ -11,6 +14,8 @@ import java.util.Map;
 import java.util.Set;
 
 public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
+
+    private final Logger logger = LogManager.getLogger(getClass());
 
     private final Set<Integer> libraryHashesSeen;
     private final Iterator<Map<String, String>> entryIterator;
@@ -134,12 +139,18 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
 
 
     @Override
-    public void close() throws Exception {
-        if(this.mavenChunkReader != null){
-            this.mavenChunkReader.close();
+    public void close(){
+        try {
+            if(this.mavenChunkReader != null){
+                this.mavenChunkReader.close();
+            }
+            if(this.mavenIndexReader != null) {
+                this.mavenIndexReader.close();
+            }
+        } catch(IOException iox){
+            logger.warn("Exception while closing maven index reader", iox);
         }
-        if(this.mavenIndexReader != null) {
-            this.mavenIndexReader.close();
-        }
+
+
     }
 }

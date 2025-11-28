@@ -29,7 +29,7 @@ import org.tudo.sse.resolution.releases.IReleaseListProvider;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SuppressWarnings("ALL")
+@SuppressWarnings("unchecked")
 class PomResolverTest {
 
     PomResolver pomResolver;
