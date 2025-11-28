@@ -26,6 +26,7 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@SuppressWarnings("unchecked")
 class MavenCentralArtifactAnalysisTest {
     final MavenCentralArtifactAnalysis analysisUnderTest = MavenCentralAnalysisFactory.buildEmptyAnalysisWithIndexRequirement();
     final String base = "https://repo1.maven.org/maven2/";
@@ -160,9 +161,9 @@ class MavenCentralArtifactAnalysisTest {
         inputs.add(new Tuple2<>(50000, 100));
         inputs.add(new Tuple2<>(763, 20));
 
-        for(Tuple2 input : inputs) {
-            int start1 = (int) input._1;
-            int take = (int) input._2;
+        for(Tuple2<Integer, Integer> input : inputs) {
+            int start1 = input._1;
+            int take = input._2;
 
             int start2 = (start1 + take) - 1;
 

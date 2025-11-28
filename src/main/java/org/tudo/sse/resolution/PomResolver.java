@@ -671,7 +671,7 @@ public class PomResolver {
         return toReturn;
     }
 
-    private Tuple2 findGA(String missing, List<org.tudo.sse.model.pom.Dependency> management) {
+    private Tuple2<String, String> findGA(String missing, List<org.tudo.sse.model.pom.Dependency> management) {
         for (org.tudo.sse.model.pom.Dependency dependency : management) {
             if (missing.equals(dependency.getIdent().getGroupID() + ":" + dependency.getIdent().getArtifactID())) {
                 if(dependency.getScope() != null) {

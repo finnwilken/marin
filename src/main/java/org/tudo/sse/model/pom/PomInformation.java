@@ -9,9 +9,9 @@ import java.util.Map;
  * This class is where all the information collected during pom resolution is stored. From the raw features to resolved transitive dependencies.
  */
 public class PomInformation extends ArtifactInformation {
-    private RawPomFeatures rawPomFeatures;
-    private List<Artifact> imports;
-    private Artifact parent;
+    protected RawPomFeatures rawPomFeatures;
+    protected List<Artifact> imports;
+    protected Artifact parent;
     private List<Dependency> resolvedDependencies;
     private List<Artifact> allTransitiveDependencies;
     private List<Artifact> effectiveTransitiveDependencies;
@@ -46,7 +46,7 @@ public class PomInformation extends ArtifactInformation {
      * Updates the value of the current rawPomFeatures.
      * @param rawPomFeatures new rawPomFeatures to set
      */
-    public void setRawPomFeatures(RawPomFeatures rawPomFeatures) {
+    public final void setRawPomFeatures(RawPomFeatures rawPomFeatures) {
         this.rawPomFeatures = rawPomFeatures;
     }
 
