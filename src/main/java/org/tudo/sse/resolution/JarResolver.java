@@ -168,7 +168,7 @@ public class JarResolver {
             numMethods += current.methods().size();
             numFields += current.fields().size();
 
-            List<Method> methods =  JavaConverters.seqAsJavaList(classfile._1.methods());
+            List<Method> methods =  scala.jdk.CollectionConverters.SeqHasAsJava(classfile._1.methods()).asJava();
             for(Method method : methods) {
                 //tally up bytecode for each method here
                 if(method.body().isDefined()) {

@@ -101,13 +101,6 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
         }
     }
 
-    /**
-     *  This method is the driver code for the analysis being done on Maven Central.
-     *  It can be configured using different command line arguments being passed to it.
-     *  There's a single-threaded implementation contained in this class, as well as a multithreaded one called here but defined in different actor classes.
-     *
-     * @param args cli passed to the program to configure the run
-     */
     @Override
     public final void runAnalysis(String[] args)  {
         // Obtain CLI arguments
@@ -135,6 +128,14 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
                     artifactConfig.progressWriteInterval, artifactConfig.progressOutputFile), "queueActor");
         }
 
+        // Invoke the beforeRunStart lifecycle hook
+        try {
+            this.beforeRunStart();
+        } catch (Exception x){
+            log.error("Unexpected exception in analysis lifecycle hook beforeRunStart", x);
+            return;
+        }
+
         if(this.artifactConfig.inputListFile == null) {
             indexProcessor();
         } else {
@@ -147,6 +148,13 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
                 this.queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
                 system.getWhenTerminated().toCompletableFuture().get();
             } catch (Exception x) { log.warn("Error closing actor system: {}", x.getMessage());}
+        }
+
+        // Invoke the afterRunEnd lifecycle hook
+        try {
+            this.afterRunEnd();
+        } catch(Exception x){
+            log.error("Unexpected exception in analysis lifecycle hook afterRunEnd", x);
         }
     }
 
@@ -192,12 +200,10 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
      * Iterates over all indexes in the maven central index and creates an artifact with the metadata collected.
      *
      * @param indexIterator an iterator for traversing the maven central index
-     * @return a list of artifact identifiers processed by this method
      * @see ArtifactIdent
      * @throws IOException when there is an issue opening a file
      */
-    List<ArtifactIdent> walkAllIndexes(IndexIterator indexIterator) throws IOException {
-        final List<ArtifactIdent> artifactIdents = new ArrayList<>();
+    private void walkAllIndexes(IndexIterator indexIterator) throws IOException {
         long entriesTaken = 0L;
 
         while(indexIterator.hasNext()) {
@@ -219,8 +225,6 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
                 processIndexIdentifier(current.getIdent());
             }
 
-            artifactIdents.add(current.getIdent());
-
             writePositionIfNeeded();
         }
 
@@ -230,7 +234,6 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
             log.info("Processed a total of {} entries.", entriesTaken);
 
         indexIterator.closeReader();
-        return artifactIdents;
     }
 
     /**

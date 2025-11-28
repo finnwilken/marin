@@ -309,7 +309,7 @@ public class JarInformation extends ArtifactInformation {
         return Project.apply(CollectionConverters.ListHasAsScala(allProjectClasses).asScala().toSeq(),
                 CollectionConverters.ListHasAsScala(allLibraryClasses).asScala().toSeq(),
                 !fullyLoadLibraries,
-                CollectionConverters.ListHasAsScala(new ArrayList<org.opalj.br.ClassFile>()).asScala().toIterable(),
+                CollectionConverters.ListHasAsScala(new ArrayList<org.opalj.br.ClassFile>()).asScala().toSeq(),
                 (a, b) -> BoxedUnit.UNIT,
                 package$.MODULE$.BaseConfig(),
                 projectLogger);

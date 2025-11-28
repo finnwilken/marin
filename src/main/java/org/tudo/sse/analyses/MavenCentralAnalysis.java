@@ -63,6 +63,29 @@ abstract class MavenCentralAnalysis {
         resolveJar = requiresJar;
     }
 
+    /**
+     * Analysis lifecycle hook that is executed before the actual analysis run is started, but after command line
+     * parameters and resolvers have been initialized. This method is called exactly once per analysis run.
+     */
+    protected void beforeRunStart(){
+        log.debug("Starting Maven Central analysis run.");
+    }
+
+
+    /**
+     * Analysis lifecycle hook that is executed after the analysis run has completed, immediately before the end of
+     * {@link #runAnalysis runAnalysis}. This method is called exactly once per analysis run.
+     */
+    protected void afterRunEnd(){
+        log.debug("Finished Maven Central analysis run.");
+    }
+
+    /**
+     *  Starts a new analysis run. Will parse the given command line arguments and create a matching analysis
+     *  configuration. Depending on the arguments provided, the analysis run will use single- or multithreaded execution.
+     *
+     * @param args Command line arguments to parse - usually taken directly from the main method's arguments.
+     */
     public abstract void runAnalysis(String[] args);
 
 }
