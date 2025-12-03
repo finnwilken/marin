@@ -150,6 +150,7 @@ public class PomResolver {
      * This method resolves all artifacts given a list of identifiers.
      *
      * @param idents list of identifiers to resolve
+     * @param ctx The resolution context to use for caching artifacts
      * @return list of resolved artifacts
      * @see Artifact
      */
@@ -182,6 +183,7 @@ public class PomResolver {
      * This method given an Artifact Identifier, resolves a single artifact (raw features, parent, imports, dependencies, and transitive dependencies).
      *
      * @param identifier id for the pom artifact to resolve
+     * @param ctx The resolution context to use for caching artifacts
      * @return an artifact with resolved PomInformation
      * @see PomInformation
      * @throws FileNotFoundException When the POM file does not exist for the given artifact
@@ -341,6 +343,7 @@ public class PomResolver {
     /**
      * This method handles resolving an artifact via raw Pom information and parent and dependency resolution
      * @param identifier used to retrieve the pom artifact from the maven central repository
+     * @param ctx The resolution context to use for caching artifacts
      * @return an artifact with resolved rawPomFeatures, parent, and import information
      * @throws PomResolutionException If the POM resolution process fails due to invalid file contents
      * @throws FileNotFoundException When the POM file does not exist for the given artifact
@@ -405,6 +408,7 @@ public class PomResolver {
      * Resolves import scope dependencies and returns their corresponding artifacts.
      * @param managedDependencies list of managed dependencies from the rawPomFeatures, to be looked through for an import
      * @param info the current information object
+     * @param ctx The resolution context to use for caching artifacts
      * @return a list of imported artifacts
      * @throws PomResolutionException handles errors that arise with pom resolution
      * @throws FileNotFoundException handles errors with not finding a file
@@ -806,6 +810,7 @@ public class PomResolver {
      * This method resolves all the transitive dependencies of a given artifact. This is done recursively working with resolveTransitives and the recursiveHandler.
      *
      * @param toResolve the current artifact transitive dependencies are being resolved for.
+     * @param ctx The resolution context to use for caching artifacts
      * @throws IOException thrown when there's an issue opening the pom for an artifact
      */
     public void resolveAllTransitives(Artifact toResolve, ResolutionContext ctx) throws IOException {
@@ -818,6 +823,7 @@ public class PomResolver {
      * @param current the current artifact transitive dependencies are being resolved for.
      * @param alrEncountered a map of dependencies that have already been resolved to avoid double resolutions
      * @param exclusions a Set of G:A values to not include in resolution
+     * @param ctx The resolution context to use for caching artifacts
      * @throws IOException thrown when there's an issue opening the pom for an artifact
      */
     public void resolveAllTransitives(Artifact current, Map<ArtifactIdent, Artifact> alrEncountered, Set<String> exclusions, ResolutionContext ctx) throws IOException {
@@ -895,6 +901,7 @@ public class PomResolver {
     /**
      * This method attempts to get all effective transitive dependencies, resolving conflicts, and removing duplicates.
      * @param toResolve the artifact for which to resolve the effective transitive dependencies
+     * @param ctx The resolution context to use for caching artifacts
      */
     public void resolveEffectiveTransitives(Artifact toResolve, ResolutionContext ctx) {
         // Can only resolve dependencies if POM info is present.

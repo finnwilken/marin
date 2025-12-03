@@ -425,6 +425,7 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
     /**
      * Invokes all resolvers as defined by the analysis configuration to enrich the given artifact identifier.
      * @param identifier Artifact identifier to enrich
+     * @param ctx The current resolution context
      */
     public void callResolver(ArtifactIdent identifier, ResolutionContext ctx) {
         if(resolvePom && resolveJar) {

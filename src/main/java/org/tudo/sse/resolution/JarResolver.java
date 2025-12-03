@@ -74,6 +74,7 @@ public class JarResolver {
      * This method resolves jar artifacts from a given list of artifact identifiers.
      *
      * @param identifiers artifact identifiers used to retrieve jar artifacts to process
+     * @param ctx The resolution context to use for creating artifacts
      * @return a list of resolved artifacts
      * @see Artifact
      */
@@ -101,6 +102,7 @@ public class JarResolver {
      * This method resolve a single jar artifact given an artifact identifier
      *
      * @param identifier an artifact identifier to retrieve the jar artifact to process
+     * @param ctx The resolution context to use for creating artifacts
      * @return a resolved artifact
      * @throws JarResolutionException when there is an issue resolving the given jar artifact
      */

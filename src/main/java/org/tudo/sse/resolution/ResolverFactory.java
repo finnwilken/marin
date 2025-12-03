@@ -44,6 +44,7 @@ public class ResolverFactory {
      * Resolve the POM file of the given artifact.
      *
      * @param identifier Artifact identifier to resolve
+     * @param ctx The resolution context for this run
      */
     public void runPom(ArtifactIdent identifier, ResolutionContext ctx) {
         try {
@@ -57,6 +58,7 @@ public class ResolverFactory {
      * Resolve the JAR file of the given artifact.
      *
      * @param identifier Artifact identifier to resolve
+     * @param ctx The resolution context for this run
      */
     public void runJar(ArtifactIdent identifier, ResolutionContext ctx) {
         try {
@@ -70,6 +72,7 @@ public class ResolverFactory {
      * Resolve both the POM and JAR file for the given artifact.
      *
      * @param identifier Artifact identifier to resolve
+     * @param ctx The resolution context for this run
      */
     public void runBoth(ArtifactIdent identifier, ResolutionContext ctx) {
         try {
