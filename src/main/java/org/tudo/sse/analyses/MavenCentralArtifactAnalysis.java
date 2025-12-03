@@ -7,6 +7,8 @@ import org.tudo.sse.CLIException;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.index.IndexInformation;
+import org.tudo.sse.model.resolution.ArtifactResolutionContext;
+import org.tudo.sse.model.resolution.ResolutionContext;
 import org.tudo.sse.multithreading.ProcessIdentifierMessage;
 import org.tudo.sse.multithreading.WorkloadIsFinalMessage;
 import org.tudo.sse.resolution.ResolverFactory;
@@ -187,11 +189,11 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
 
     }
 
-    private void processIndex(Artifact current) {
+    private void processIndex(Artifact current, ArtifactResolutionContext ctx) {
         if(this.artifactConfig.multipleThreads) {
-            queueActorRef.tell(new ProcessIdentifierMessage(current.getIdent(), this), ActorRef.noSender());
+            queueActorRef.tell(new ProcessIdentifierMessage(ctx, this), ActorRef.noSender());
         } else {
-            callResolver(current.getIdent());
+            callResolver(current.getIdent(), ctx);
             analyzeArtifact(current);
         }
     }
@@ -218,11 +220,15 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
                 }
             }
 
+            final ArtifactResolutionContext ctx = ArtifactResolutionContext.newInstance(current.getIdent());
+
             if(resolveIndex){
-                final Artifact artifact = ArtifactFactory.createArtifact(current);
-                processIndex(artifact);
+                final Artifact currentArtifact = ctx.createArtifact(current.getIdent());
+                currentArtifact.setIndexInformation(current);
+
+                processIndex(currentArtifact, ctx);
             } else {
-                processIndexIdentifier(current.getIdent());
+                processIndexIdentifier(current.getIdent(), ctx);
             }
 
             writePositionIfNeeded();
@@ -261,11 +267,15 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
                 }
             }
 
+            final ArtifactResolutionContext ctx = ArtifactResolutionContext.newInstance(current.getIdent());
+
             if(resolveIndex){
-                final Artifact artifact = ArtifactFactory.createArtifact(current);
-                processIndex(artifact);
+                final Artifact currentArtifact = ctx.createArtifact(current.getIdent());
+                currentArtifact.setIndexInformation(current);
+
+                processIndex(currentArtifact, ctx);
             } else {
-                processIndexIdentifier(current.getIdent());
+                processIndexIdentifier(current.getIdent(), ctx);
             }
 
             artifactIdents.add(current.getIdent());
@@ -314,11 +324,16 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
                     }
                 }
 
+                final ArtifactResolutionContext ctx = ArtifactResolutionContext.newInstance(current.getIdent());
+
                 if(resolveIndex){
-                    final Artifact artifact = ArtifactFactory.createArtifact(current);
-                    processIndex(artifact);
+                    // If we want to retain index information, build an artifact and attach it
+                    final Artifact currentArtifact = ctx.createArtifact(current.getIdent());
+                    currentArtifact.setIndexInformation(current);
+
+                    processIndex(currentArtifact, ctx);
                 } else {
-                    processIndexIdentifier(current.getIdent());
+                    processIndexIdentifier(current.getIdent(), ctx);
                 }
 
                 artifactIdents.add(current.getIdent());
@@ -336,13 +351,14 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
         return artifactIdents;
     }
 
-    private void processIndexIdentifier(ArtifactIdent ident) {
+    private void processIndexIdentifier(ArtifactIdent ident, ArtifactResolutionContext ctx) {
         if(this.artifactConfig.multipleThreads){
-            queueActorRef.tell(new ProcessIdentifierMessage(ident, this), ActorRef.noSender());
+            queueActorRef.tell(new ProcessIdentifierMessage(ctx, this), ActorRef.noSender());
         } else {
-            callResolver(ident);
-            if(ArtifactFactory.getArtifact(ident) != null) {
-                analyzeArtifact(ArtifactFactory.getArtifact(ident));
+            callResolver(ident, ctx);
+            final Artifact artifact = ctx.getArtifact(ident);
+            if(artifact != null) {
+                analyzeArtifact(artifact);
             }
         }
     }
@@ -388,8 +404,10 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
             entriesTaken += 1L;
 
             if(current != null){
+                final ArtifactResolutionContext resolutionCtx = ArtifactResolutionContext.newInstance(current);
+
                 identifiers.add(current);
-                processIndexIdentifier(current);
+                processIndexIdentifier(current, resolutionCtx);
             }
         }
 
@@ -409,13 +427,13 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
      * Invokes all resolvers as defined by the analysis configuration to enrich the given artifact identifier.
      * @param identifier Artifact identifier to enrich
      */
-    public void callResolver(ArtifactIdent identifier) {
+    public void callResolver(ArtifactIdent identifier, ResolutionContext ctx) {
         if(resolvePom && resolveJar) {
-            resolverFactory.runBoth(identifier);
+            resolverFactory.runBoth(identifier, ctx);
         } else if(resolvePom) {
-            resolverFactory.runPom(identifier);
+            resolverFactory.runPom(identifier, ctx);
         } else if(resolveJar) {
-            resolverFactory.runJar(identifier);
+            resolverFactory.runJar(identifier, ctx);
         }
     }
 

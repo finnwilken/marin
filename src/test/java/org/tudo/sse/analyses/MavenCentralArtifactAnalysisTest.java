@@ -155,6 +155,17 @@ class MavenCentralArtifactAnalysisTest {
     @Test
     @DisplayName("An analysis must adhere to pagination configurations")
     void walkPaginated() {
+
+        final Map<ArtifactIdent, Artifact> artifactsSeen = new HashMap<>();
+        final MavenCentralArtifactAnalysis theAnalysis = new MavenCentralArtifactAnalysis(true, false, false, false) {
+            @Override
+            public void analyzeArtifact(Artifact current) {
+                artifactsSeen.put(current.getIdent(), current);
+            }
+        };
+
+
+
         List<Tuple2<Integer, Integer>> inputs = new ArrayList<>();
         inputs.add(new Tuple2<>(500, 10));
         inputs.add(new Tuple2<>(0, 10));
@@ -169,19 +180,23 @@ class MavenCentralArtifactAnalysisTest {
 
             try {
                 IndexIterator iterator = new IndexIterator(new URI(base), start1);
-                List<ArtifactIdent> collected1 = new ArrayList<>(analysisUnderTest.walkPaginated(take, iterator));
+                List<ArtifactIdent> collected1 = new ArrayList<>(theAnalysis.walkPaginated(take, iterator));
 
-                Artifact lastOne = ArtifactFactory.getArtifact(collected1.get(collected1.size() - 1));
+                Artifact lastOne = artifactsSeen.get(collected1.get(collected1.size() - 1));
+
+                assertNotNull(lastOne);
+
                 int i = 2;
                 while(lastOne.getIndexInformation().getIndex() > start2) {
-                    lastOne = ArtifactFactory.getArtifact(collected1.get(collected1.size() - i));
+                    lastOne = artifactsSeen.get(collected1.get(collected1.size() - i));
+                    assertNotNull(lastOne);
                     i++;
                 }
 
                 iterator = new IndexIterator(new URI(base), start2);
 
-                List<ArtifactIdent> collected2 = new ArrayList<>(analysisUnderTest.walkPaginated(1, iterator));
-                long lastOne2 = ArtifactFactory.getArtifact(collected2.get(0)).getIndexInformation().getIndex();
+                List<ArtifactIdent> collected2 = new ArrayList<>(theAnalysis.walkPaginated(1, iterator));
+                long lastOne2 = artifactsSeen.get(collected2.get(0)).getIndexInformation().getIndex();
                 assertEquals(lastOne.getIndexInformation().getIndex(), lastOne2);
             } catch (IOException | URISyntaxException e) {
                 throw new RuntimeException(e);

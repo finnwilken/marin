@@ -5,6 +5,7 @@ import org.apache.logging.log4j.Logger;
 import org.tudo.sse.model.index.IndexInformation;
 import org.tudo.sse.model.jar.*;
 import org.tudo.sse.model.pom.PomInformation;
+import org.tudo.sse.model.resolution.ResolutionContext;
 import org.tudo.sse.resolution.JarResolutionException;
 import org.tudo.sse.resolution.JarResolver;
 
@@ -186,10 +187,12 @@ public class Artifact {
             Map<String, Artifact> depArts = new HashMap<>();
 
             if(pomInformation != null) {
-                JarResolver resolver = new JarResolver();
+                final ResolutionContext resolutionCtx = ResolutionContext.createAnonymousContext();
+                final JarResolver resolver = new JarResolver();
+
                 for(Artifact artifact : pomInformation.getEffectiveTransitiveDependencies()) {
                     try {
-                        artifact.setJarInformation(resolver.parseJar(artifact.getIdent()).getJarInformation());
+                        artifact.setJarInformation(resolver.parseJar(artifact.getIdent(), resolutionCtx).getJarInformation());
                         depArts.put(artifact.getIdent().getGroupID() + ":" + artifact.getIdent().getArtifactID(), artifact);
                     } catch (JarResolutionException e) {
                         log.error(e);

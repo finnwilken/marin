@@ -15,6 +15,7 @@ import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.jar.JarInformation;
 import org.tudo.sse.model.jar.ObjType;
+import org.tudo.sse.model.resolution.ResolutionContext;
 import org.tudo.sse.utils.MavenCentralRepository;
 import scala.Tuple2;
 
@@ -77,12 +78,12 @@ public class JarResolver {
      * @return a list of resolved artifacts
      * @see Artifact
      */
-    public List<Artifact> resolveJars(List<ArtifactIdent> identifiers) {
+    public List<Artifact> resolveJars(List<ArtifactIdent> identifiers, ResolutionContext ctx) {
         List<Artifact> toReturn = new ArrayList<>();
         int count = 0;
         for(ArtifactIdent current : identifiers) {
             try {
-                toReturn.add(parseJar(current));
+                toReturn.add(parseJar(current, ctx));
             } catch (JarResolutionException e) {
                 log.error(e);
             }
@@ -104,10 +105,12 @@ public class JarResolver {
      * @return a resolved artifact
      * @throws JarResolutionException when there is an issue resolving the given jar artifact
      */
-    public Artifact parseJar(ArtifactIdent identifier) throws JarResolutionException {
-        if(ArtifactFactory.getArtifact(identifier) != null && Objects.requireNonNull(ArtifactFactory.getArtifact(identifier)).getJarInformation() != null) {
-            return ArtifactFactory.getArtifact(identifier);
-        }
+    public Artifact parseJar(ArtifactIdent identifier, ResolutionContext ctx) throws JarResolutionException {
+        final Artifact currentArtifact = ctx.createArtifact(identifier);
+
+        // Only build jar information if it is not already present for the current resolution context
+        if(currentArtifact.hasJarInformation())
+            return currentArtifact;
 
         try {
             URL jarURL = identifier.getMavenCentralJarUri().toURL();
@@ -137,7 +140,13 @@ public class JarResolver {
             }
 
             List<Tuple2<ClassFile, URL>> classList = readClassesFromJarStream(jarInput, jarURL);
-            return ArtifactFactory.createArtifact(parsingClassFiles(classList, identifier));
+
+            final JarInformation theJarInformation = parsingClassFiles(classList, identifier);
+
+            // Finally set jar information for current artifact, then return
+            currentArtifact.setJarInformation(theJarInformation);
+
+            return currentArtifact;
 
         } catch (IOException e) {
             log.error(e);

@@ -23,6 +23,7 @@ import org.apache.commons.io.IOUtils;
 import org.tudo.sse.model.pom.Dependency;
 import org.tudo.sse.model.pom.License;
 import org.tudo.sse.model.pom.RawPomFeatures;
+import org.tudo.sse.model.resolution.ResolutionContext;
 import org.tudo.sse.resolution.releases.DefaultMavenReleaseListProvider;
 import org.tudo.sse.resolution.releases.IReleaseListProvider;
 
@@ -33,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class PomResolverTest {
 
     PomResolver pomResolver;
+    ResolutionContext testContext;
 
     Map<String, Object> json;
     Gson gson = new Gson();
@@ -48,6 +50,7 @@ class PomResolverTest {
     @BeforeEach
     void setUp() {
            pomResolver = new PomResolver(true);
+           testContext = ResolutionContext.createAnonymousContext();
     }
 
     @Test
@@ -83,7 +86,7 @@ class PomResolverTest {
 
         ArrayList<Map<String, Object>> expected = (ArrayList<Map<String, Object>>) json.get("resolveArtifacts");
 
-        List<Artifact> poms = pomResolver.resolveArtifacts(idents);
+        List<Artifact> poms = pomResolver.resolveArtifacts(idents, testContext);
 
         //check to see that the parsed data from the POM for these indexes are correct for actually retrieving the files from url
         for(int i = 0; i < expected.size(); i++) {
@@ -148,7 +151,7 @@ class PomResolverTest {
         ArrayList<ArrayList<String>> temp = (ArrayList<ArrayList<String>>) allTestData.get("tests");
 
         //check expected values against processed ones?
-        List<Artifact> results = pomResolver.resolveArtifacts(idents);
+        List<Artifact> results = pomResolver.resolveArtifacts(idents, testContext);
 
         for(int i = 0; i < results.size(); i++) {
             List<Dependency> current = results.get(i).getPomInformation().getResolvedDependencies();
@@ -276,7 +279,7 @@ class PomResolverTest {
         ArrayList<String> currentDependencies = (ArrayList<String>) allTransitives.get("dependencies");
         List<ArtifactIdent> idents = new ArrayList<>();
         idents.add(new ArtifactIdent("org.openengsb", "openengsb-maven-plugin", "1.3.1"));
-        List<Artifact> results = pomResolver.resolveArtifacts(idents);
+        List<Artifact> results = pomResolver.resolveArtifacts(idents, testContext);
 
         //create a recursive driver, that takes in the main map and the dependencies list, so it can recur to each level of the tree
         for(Artifact current : results) {
@@ -310,7 +313,7 @@ class PomResolverTest {
         ArrayList<Map<String, ArrayList<String>>> conflicts = (ArrayList<Map<String, ArrayList<String>>>) json.get("conflicts");
 
         //check expected values against processed ones?
-        List<Artifact> results = pomResolver.resolveArtifacts(idents);
+        List<Artifact> results = pomResolver.resolveArtifacts(idents, testContext);
 
         for(int i = 0; i < results.size(); i++) {
 
@@ -357,7 +360,7 @@ class PomResolverTest {
 
         //set up expected values from mvn dependency tree to the json file
         ArrayList<String> expectedDeps = (ArrayList<String>) json.get("2ndRepo");
-        List<Artifact> results = pomResolver.resolveArtifacts(idents);
+        List<Artifact> results = pomResolver.resolveArtifacts(idents, testContext);
 
         for(int i = 0; i < results.size(); i++) {
             List<Artifact> current = results.get(i).getPomInformation().getEffectiveTransitiveDependencies();
