@@ -5,7 +5,7 @@ import akka.actor.ActorSystem;
 import org.tudo.sse.CLIException;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
-import org.tudo.sse.model.resolution.LibraryResolutionContext;
+import org.tudo.sse.model.LibraryResolutionContext;
 import org.tudo.sse.multithreading.WorkloadIsFinalMessage;
 import org.tudo.sse.multithreading.ProcessLibraryMessage;
 import org.tudo.sse.multithreading.QueueActor;

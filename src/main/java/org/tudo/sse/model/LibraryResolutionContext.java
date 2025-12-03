@@ -1,6 +1,4 @@
-package org.tudo.sse.model.resolution;
-
-import org.tudo.sse.model.Artifact;
+package org.tudo.sse.model;
 
 import java.util.ArrayList;
 import java.util.List;

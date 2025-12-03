@@ -14,7 +14,7 @@ import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.jar.JarInformation;
 import org.tudo.sse.model.jar.ObjType;
-import org.tudo.sse.model.resolution.ResolutionContext;
+import org.tudo.sse.model.ResolutionContext;
 import org.tudo.sse.utils.MavenCentralRepository;
 import scala.Tuple2;
 

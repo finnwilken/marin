@@ -1,7 +1,4 @@
-package org.tudo.sse.model.resolution;
-
-import org.tudo.sse.model.Artifact;
-import org.tudo.sse.model.ArtifactIdent;
+package org.tudo.sse.model;
 
 import java.util.HashMap;
 import java.util.HashSet;

@@ -8,7 +8,7 @@ import java.io.IOException;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.index.IndexInformation;
-import org.tudo.sse.model.resolution.ResolutionContext;
+import org.tudo.sse.model.ResolutionContext;
 import org.tudo.sse.utils.IndexIterator;
 
 import java.net.URI;

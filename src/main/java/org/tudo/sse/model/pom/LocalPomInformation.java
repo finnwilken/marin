@@ -4,7 +4,7 @@ import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.tudo.sse.model.*;
-import org.tudo.sse.model.resolution.ResolutionContext;
+import org.tudo.sse.model.ResolutionContext;
 import org.tudo.sse.resolution.PomResolutionException;
 import org.tudo.sse.resolution.PomResolver;
 

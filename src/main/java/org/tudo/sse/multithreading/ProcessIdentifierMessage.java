@@ -2,7 +2,7 @@ package org.tudo.sse.multithreading;
 
 import org.tudo.sse.analyses.MavenCentralArtifactAnalysis;
 import org.tudo.sse.model.ArtifactIdent;
-import org.tudo.sse.model.resolution.ArtifactResolutionContext;
+import org.tudo.sse.model.ArtifactResolutionContext;
 
 /**
  * A message passed to the processing queue to indicate that a given analysis instance must process the given

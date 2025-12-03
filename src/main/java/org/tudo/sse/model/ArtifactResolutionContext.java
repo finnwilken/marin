@@ -1,8 +1,6 @@
-package org.tudo.sse.model.resolution;
+package org.tudo.sse.model;
 
-import org.tudo.sse.model.ArtifactIdent;
-
-public class ArtifactResolutionContext extends ResolutionContext {
+public final class ArtifactResolutionContext extends ResolutionContext {
 
     private final ArtifactIdent identifier;
 

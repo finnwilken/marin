@@ -4,7 +4,7 @@ import akka.actor.AbstractActor;
 import akka.actor.Props;
 import akka.japi.pf.ReceiveBuilder;
 import org.tudo.sse.model.ArtifactIdent;
-import org.tudo.sse.model.resolution.ArtifactResolutionContext;
+import org.tudo.sse.model.ArtifactResolutionContext;
 
 /**
  * This class is spawned in multiple threads

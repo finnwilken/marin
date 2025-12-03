@@ -23,8 +23,7 @@ import org.apache.commons.io.IOUtils;
 import org.tudo.sse.model.pom.Dependency;
 import org.tudo.sse.model.pom.License;
 import org.tudo.sse.model.pom.RawPomFeatures;
-import org.tudo.sse.model.resolution.ResolutionContext;
-import org.tudo.sse.resolution.releases.DefaultMavenReleaseListProvider;
+import org.tudo.sse.model.ResolutionContext;
 import org.tudo.sse.resolution.releases.IReleaseListProvider;
 
 

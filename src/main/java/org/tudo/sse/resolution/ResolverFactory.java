@@ -1,13 +1,12 @@
 package org.tudo.sse.resolution;
 
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Path;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.tudo.sse.model.ArtifactIdent;
-import org.tudo.sse.model.resolution.ResolutionContext;
+import org.tudo.sse.model.ResolutionContext;
 
 /**
  * This class manages the pom and jar resolver, giving a way to run one or the other.

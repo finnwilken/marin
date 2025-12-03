@@ -7,7 +7,6 @@ import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.Test;
 import org.tudo.sse.model.jar.ClassFileNode;
 import org.tudo.sse.model.jar.DefinedClassFileNode;
-import org.tudo.sse.model.resolution.ResolutionContext;
 import org.tudo.sse.resolution.*;
 
 import java.io.IOException;

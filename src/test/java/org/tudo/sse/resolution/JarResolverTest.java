@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.jar.ClassFile;
 import org.tudo.sse.model.jar.JarInformation;
-import org.tudo.sse.model.resolution.ResolutionContext;
+import org.tudo.sse.model.ResolutionContext;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
