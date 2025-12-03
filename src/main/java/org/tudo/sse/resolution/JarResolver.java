@@ -10,7 +10,6 @@ import org.opalj.br.analyses.Project$;
 import org.opalj.br.package$;
 import org.opalj.br.reader.Java16LibraryFramework;
 import org.opalj.log.GlobalLogContext$;
-import org.tudo.sse.ArtifactFactory;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.jar.JarInformation;

@@ -3,7 +3,6 @@ package org.tudo.sse.multithreading;
 import akka.actor.AbstractActor;
 import akka.actor.Props;
 import akka.japi.pf.ReceiveBuilder;
-import org.tudo.sse.ArtifactFactory;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.resolution.ArtifactResolutionContext;
 

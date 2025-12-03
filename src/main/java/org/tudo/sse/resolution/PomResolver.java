@@ -11,7 +11,6 @@ import org.eclipse.aether.util.version.GenericVersionScheme;
 import org.eclipse.aether.version.InvalidVersionSpecificationException;
 import org.eclipse.aether.version.Version;
 import org.eclipse.aether.version.VersionRange;
-import org.tudo.sse.ArtifactFactory;
 import org.tudo.sse.model.*;
 import org.tudo.sse.model.pom.License;
 import org.tudo.sse.model.pom.PomInformation;

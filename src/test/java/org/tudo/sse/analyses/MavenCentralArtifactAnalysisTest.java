@@ -2,10 +2,8 @@ package org.tudo.sse.analyses;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.tudo.sse.ArtifactFactory;
 import org.tudo.sse.CLIException;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
@@ -38,11 +36,6 @@ class MavenCentralArtifactAnalysisTest {
         assert resource != null;
         Reader targetReader = new InputStreamReader(resource);
         json = gson.fromJson(targetReader, new TypeToken<Map<String, Object>>() {}.getType());
-    }
-
-    @AfterEach
-    public void cleanup(){
-        ArtifactFactory.artifacts.clear();
     }
 
     @Test
@@ -294,15 +287,21 @@ class MavenCentralArtifactAnalysisTest {
 
         for(int i = 0; i < singleArgs.size(); i++) {
 
-            MavenCentralArtifactAnalysis tester = MavenCentralAnalysisFactory.buildEmptyAnalysisWithPomRequirement();
+            Set<ArtifactIdent> identifiersSeen = new HashSet<>();
+            MavenCentralArtifactAnalysis tester = new MavenCentralArtifactAnalysis(false, true, false, false) {
+                @Override
+                public void analyzeArtifact(Artifact current) {
+                    identifiersSeen.add(current.ident);
+                }
+            };
 
             tester.runAnalysis(singleArgs.get(i));
-            Set<ArtifactIdent> singleResult = ArtifactFactory.artifacts.keySet();
-            cleanup();
+            Set<ArtifactIdent> singleResult = new HashSet<>(identifiersSeen);
+
+            identifiersSeen.clear();
 
             tester.runAnalysis(multiArgs.get(i));
-            Set<ArtifactIdent> multiResult = ArtifactFactory.artifacts.keySet();
-            cleanup();
+            Set<ArtifactIdent> multiResult = new HashSet<>(identifiersSeen);
 
             assertEquals(singleResult.size(), multiResult.size());
 

@@ -2,7 +2,6 @@ package org.tudo.sse.analyses;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
-import org.tudo.sse.ArtifactFactory;
 import org.tudo.sse.CLIException;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;

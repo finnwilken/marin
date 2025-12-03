@@ -8,6 +8,7 @@ import java.io.IOException;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.index.IndexInformation;
+import org.tudo.sse.model.resolution.ResolutionContext;
 import org.tudo.sse.utils.IndexIterator;
 
 import java.net.URI;
@@ -82,9 +83,16 @@ public class IndexWalker implements Iterable<IndexInformation> {
             indexIterator = new IndexIterator(base);
         }
 
+        final ResolutionContext ctx = ResolutionContext.createAnonymousContext();
+
         List<Artifact> artifacts = new ArrayList<>();
         while(indexIterator.hasNext()) {
-            artifacts.add(ArtifactFactory.createArtifact(indexIterator.next()));
+            final IndexInformation indexInformation = indexIterator.next();
+            final Artifact theArtifact = ctx.createArtifact(indexInformation.getIdent());
+
+            theArtifact.setIndexInformation(indexInformation);
+
+            artifacts.add(theArtifact);
         }
 
         if(artifacts.size() % 500000 == 0) {
@@ -135,13 +143,21 @@ public class IndexWalker implements Iterable<IndexInformation> {
         if(resetIterator) {
             indexIterator = new IndexIterator(base);
         }
+
+        final ResolutionContext ctx = ResolutionContext.createAnonymousContext();
+
         List<Artifact> artifacts = new ArrayList<>();
 
         int count = 0;
         int fromFront = 0;
         while(indexIterator.hasNext() && count < take) {
             if(fromFront >= skip) {
-                artifacts.add(ArtifactFactory.createArtifact(indexIterator.next()));
+                final IndexInformation indexInformation = indexIterator.next();
+                final Artifact theArtifact = ctx.createArtifact(indexInformation.getIdent());
+
+                theArtifact.setIndexInformation(indexInformation);
+
+                artifacts.add(theArtifact);
                 count++;
             } else {
                 indexIterator.next();
@@ -163,15 +179,22 @@ public class IndexWalker implements Iterable<IndexInformation> {
             if(resetIterator) {
                 indexIterator = new IndexIterator(base);
             }
+
+            final ResolutionContext ctx = ResolutionContext.createAnonymousContext();
+
             List<Artifact> artifacts = new ArrayList<>();
 
             long currentToSince = 0;
             long sinceToUntil = since;
             while(indexIterator.hasNext() && sinceToUntil < until) {
-                IndexInformation temp = indexIterator.next();
+                final IndexInformation temp = indexIterator.next();
                 if(currentToSince >= since) {
                     sinceToUntil = temp.getLastModified();
-                    artifacts.add(ArtifactFactory.createArtifact(temp));
+
+                    final Artifact theArtifact = ctx.createArtifact(temp.getIdent());
+                    theArtifact.setIndexInformation(temp);
+
+                    artifacts.add(theArtifact);
                 } else {
                     currentToSince = temp.getLastModified();
                 }

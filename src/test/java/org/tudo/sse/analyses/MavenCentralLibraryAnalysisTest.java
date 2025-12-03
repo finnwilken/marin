@@ -1,9 +1,7 @@
 package org.tudo.sse.analyses;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.tudo.sse.ArtifactFactory;
 import org.tudo.sse.CLIException;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.utils.CommonConfigParser;
@@ -19,11 +17,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class MavenCentralLibraryAnalysisTest {
-
-    @AfterEach
-    public void cleanup(){
-        ArtifactFactory.artifacts.clear();
-    }
 
     @Test
     @DisplayName("The CLI parser must parse common argument values correctly")
