@@ -31,13 +31,4 @@ public final class LibraryResolutionContext extends ResolutionContext {
         return libraryGA;
     }
 
-    @Override
-    public boolean isLibraryResolutionContext() {
-        return true;
-    }
-
-    @Override
-    public LibraryResolutionContext asLibraryResolutionContext(){
-        return this;
-    }
 }

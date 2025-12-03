@@ -18,14 +18,4 @@ public class ArtifactResolutionContext extends ResolutionContext {
         return identifier;
     }
 
-    @Override
-    public boolean isArtifactResolutionContext() {
-        return true;
-    }
-
-    @Override
-    public ArtifactResolutionContext asArtifactResolutionContext() {
-        return this;
-    }
-
 }

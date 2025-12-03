@@ -33,21 +33,4 @@ public abstract class ResolutionContext {
         return new HashSet<>(artifactsResolved.values());
     }
 
-    public boolean isLibraryResolutionContext(){
-        return false;
-    }
-
-    public LibraryResolutionContext asLibraryResolutionContext(){
-        throw new IllegalStateException("Not a library resolution context");
-    }
-
-    public boolean isArtifactResolutionContext(){
-        return false;
-    }
-
-    public ArtifactResolutionContext asArtifactResolutionContext(){
-        throw new IllegalStateException("Not an artifact resolution context");
-    }
-
-
 }
