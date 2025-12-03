@@ -149,11 +149,11 @@ class MavenCentralArtifactAnalysisTest {
     @DisplayName("An analysis must adhere to pagination configurations")
     void walkPaginated() {
 
-        final Map<ArtifactIdent, Artifact> artifactsSeen = new HashMap<>();
+        final List<Artifact> artifactsSeen = new ArrayList<>();
         final MavenCentralArtifactAnalysis theAnalysis = new MavenCentralArtifactAnalysis(true, false, false, false) {
             @Override
             public void analyzeArtifact(Artifact current) {
-                artifactsSeen.put(current.getIdent(), current);
+                artifactsSeen.add(current);
             }
         };
 
@@ -173,23 +173,27 @@ class MavenCentralArtifactAnalysisTest {
 
             try {
                 IndexIterator iterator = new IndexIterator(new URI(base), start1);
-                List<ArtifactIdent> collected1 = new ArrayList<>(theAnalysis.walkPaginated(take, iterator));
+                theAnalysis.walkPaginated(take, iterator);
 
-                Artifact lastOne = artifactsSeen.get(collected1.get(collected1.size() - 1));
+                assertFalse(artifactsSeen.isEmpty());
+
+                Artifact lastOne = artifactsSeen.get(artifactsSeen.size() - 1);
 
                 assertNotNull(lastOne);
 
                 int i = 2;
                 while(lastOne.getIndexInformation().getIndex() > start2) {
-                    lastOne = artifactsSeen.get(collected1.get(collected1.size() - i));
+                    lastOne = artifactsSeen.get(artifactsSeen.size() - i);
                     assertNotNull(lastOne);
                     i++;
                 }
 
                 iterator = new IndexIterator(new URI(base), start2);
 
-                List<ArtifactIdent> collected2 = new ArrayList<>(theAnalysis.walkPaginated(1, iterator));
-                long lastOne2 = artifactsSeen.get(collected2.get(0)).getIndexInformation().getIndex();
+                artifactsSeen.clear();
+                theAnalysis.walkPaginated(1, iterator);
+
+                long lastOne2 = artifactsSeen.get(0).getIndexInformation().getIndex();
                 assertEquals(lastOne.getIndexInformation().getIndex(), lastOne2);
             } catch (IOException | URISyntaxException e) {
                 throw new RuntimeException(e);
@@ -230,7 +234,7 @@ class MavenCentralArtifactAnalysisTest {
 
     @Test
     @DisplayName("An analysis must correctly apply CLI options when reading custom input lists")
-    void readIdentsIn() throws URISyntaxException, IOException {
+    void readIdentsIn() {
         List<String[]> cliInputs = new ArrayList<>();
         String[] args = {"--inputs", "src/main/resources/coordinates.txt"};
         cliInputs.add(args);
@@ -251,22 +255,26 @@ class MavenCentralArtifactAnalysisTest {
         int i = 0;
         for(String[] arg : cliInputs) {
             List<String> curExpected = expected.get(i);
-            MavenCentralArtifactAnalysis tester = MavenCentralAnalysisFactory.buildEmptyAnalysisWithNoRequirements();
+            List<Artifact> artifactsSeen = new ArrayList<>();
+            MavenCentralArtifactAnalysis collectorAnalysis = new MavenCentralArtifactAnalysis(false, false, false, false) {
+                @Override
+                public void analyzeArtifact(Artifact current) {
+                    artifactsSeen.add(current);
+                }
+            };
 
             // Apply arguments, check progress is stored correctly
-            tester.runAnalysis(arg);
-            Path progressFile = tester.getSetupInfo().progressOutputFile;
+            collectorAnalysis.runAnalysis(arg);
+            Path progressFile = collectorAnalysis.getSetupInfo().progressOutputFile;
             long ending = getEndingIndex(progressFile);
             assertEquals(expectedEndings[i], ending);
 
-            // Process file a second time to obtain return value
-            List<ArtifactIdent> idents = tester.processArtifactsFromInputFile();
-            assertEquals(curExpected.size(), idents.size());
+            assertEquals(curExpected.size(), artifactsSeen.size());
 
 
 
-            for(ArtifactIdent actual: idents) {
-                final String actualCoordinates = actual.getCoordinates();
+            for(Artifact actual: artifactsSeen) {
+                final String actualCoordinates = actual.getIdent().getCoordinates();
                 assert(curExpected.contains(actualCoordinates));
             }
             i++;

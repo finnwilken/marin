@@ -20,9 +20,7 @@ import org.tudo.sse.utils.MavenCentralRepository;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 
 /**
  * The MavenCentralAnalysis enables analysis of artifacts on the maven central repository for jobs of any size.
@@ -246,12 +244,10 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
      *
      * @param take number of artifacts from the starting point to capture
      * @param indexIterator an iterator for traversing the maven central index
-     * @return a list of artifact identifiers processed by this method
      * @see ArtifactIdent
      * @throws IOException when there is an issue opening a file
      */
-    List<ArtifactIdent> walkPaginated(long take, IndexIterator indexIterator) throws IOException {
-        final List<ArtifactIdent> artifactIdents = new ArrayList<>();
+    void walkPaginated(long take, IndexIterator indexIterator) throws IOException {
         long entriesTaken = 0L;
 
         while(indexIterator.hasNext() && entriesTaken < take) {
@@ -277,8 +273,6 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
                 processIndexIdentifier(current.getIdent(), ctx);
             }
 
-            artifactIdents.add(current.getIdent());
-
             writePositionIfNeeded();
         }
 
@@ -288,22 +282,18 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
             log.info("Processed a total of {} entries.", entriesTaken);
 
         indexIterator.closeReader();
-        return artifactIdents;
     }
 
     /**
-     * Iterates over all indexes in the maven central index.
-     * It collects a list of artifact identifiers that are within the range of since and until.
+     * Invokes analysis configuration for all artifact identifiers in the date window defined by given boundaries.
      *
      * @param since lower bound of dates of artifacts to collect
      * @param until upper bound of dates of artifacts to collect
      * @param indexIterator an iterator for traversing the maven central index
-     * @return a list of artifact identifiers processed by this method
      * @see ArtifactIdent
      * @throws IOException when there is an issue opening a file
      */
-    List<ArtifactIdent> walkDates(long since, long until, IndexIterator indexIterator) throws IOException {
-        final List<ArtifactIdent> artifactIdents = new ArrayList<>();
+    void walkDates(long since, long until, IndexIterator indexIterator) throws IOException {
         long entriesTaken = 0L;
 
         long currentToSince;
@@ -334,8 +324,6 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
                 } else {
                     processIndexIdentifier(current.getIdent(), ctx);
                 }
-
-                artifactIdents.add(current.getIdent());
             }
 
             writePositionIfNeeded();
@@ -347,7 +335,6 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
             log.info("Processed a total of {} entries.", entriesTaken);
 
         indexIterator.closeReader();
-        return artifactIdents;
     }
 
     private void processIndexIdentifier(ArtifactIdent ident, ArtifactResolutionContext ctx) {
@@ -364,10 +351,8 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
 
     /**
      * Reads in identifiers from a file, using the configuration passed into it.
-     *
-     * @return a list of identifiers collected from the file
      */
-    List<ArtifactIdent> processArtifactsFromInputFile() {
+    void processArtifactsFromInputFile() {
         final Iterator<ArtifactIdent> fileIterator = new FileBasedArtifactIterator(this.artifactConfig.inputListFile);
 
         // Restore from progress file if available
@@ -386,7 +371,6 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
         if(!fileIterator.hasNext())
             log.warn("No more contents left to process in input file: {}", this.artifactConfig.inputListFile);
 
-        final List<ArtifactIdent> identifiers = new ArrayList<>();
         final boolean takeLimited = this.artifactConfig.take >= 0;
 
         long entriesTaken = 0L;
@@ -405,7 +389,6 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
             if(current != null){
                 final ArtifactResolutionContext resolutionCtx = ArtifactResolutionContext.newInstance(current);
 
-                identifiers.add(current);
                 processIndexIdentifier(current, resolutionCtx);
             }
         }
@@ -418,8 +401,6 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
             // Write position one final time - in multithreaded mode the queue worker will take care of this
             writePosition();
         }
-
-        return identifiers;
     }
 
     /**
@@ -434,6 +415,9 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
             resolverFactory.runPom(identifier, ctx);
         } else if(resolveJar) {
             resolverFactory.runJar(identifier, ctx);
+        } else {
+            // If no sources are configured, we still want to have an "empty" artifact so it can be returned later
+            ctx.createArtifact(identifier);
         }
     }
 
