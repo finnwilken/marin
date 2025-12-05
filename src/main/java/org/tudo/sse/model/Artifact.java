@@ -35,50 +35,9 @@ public class Artifact {
      * Create a new artifact with no information attached.
      * @param ident The artifact identifier
      */
-    public Artifact(ArtifactIdent ident){
+    Artifact(ArtifactIdent ident){
         this.ident = ident;
     }
-
-    /**
-     * Creates a new artifact based on given IndexInformation. This artifact will have no POM or JAR information
-     * associated.
-     *
-     * @param indexInformation The IndexInformation for which to create the artifact
-     */
-    public Artifact(IndexInformation indexInformation) {
-        this.indexInformation = indexInformation;
-        this.ident = indexInformation.getIdent();
-        pomInformation = null;
-        jarInformation = null;
-    }
-
-    /**
-     * Creates a new artifact based on given PomInformation. This artifact will have no Index or JAR information
-     * associated.
-     *
-     * @param pomInformation The PomInformation for which to create the artifact
-     */
-    public Artifact(PomInformation pomInformation) {
-        this.pomInformation = pomInformation;
-        this.ident = pomInformation.getIdent();
-        this.relocation = pomInformation.getRelocation();
-        indexInformation = null;
-        jarInformation = null;
-    }
-
-    /**
-     * Creates a new artifact based on the given JarInformation. This artifact will have no Index or POM information
-     * associated.
-     *
-     * @param jarInformation The JarInformation for which to create the artifact
-     */
-    public Artifact(JarInformation jarInformation) {
-        this.jarInformation = jarInformation;
-        this.ident = jarInformation.getIdent();
-        indexInformation = null;
-        pomInformation = null;
-    }
-
 
     /**
      * Returns the artifact identifier for this artifact.
@@ -186,10 +145,12 @@ public class Artifact {
             Map<String, Artifact> depArts = new HashMap<>();
 
             if(pomInformation != null) {
-                JarResolver resolver = new JarResolver();
+                final ResolutionContext resolutionCtx = ResolutionContext.createAnonymousContext();
+                final JarResolver resolver = new JarResolver();
+
                 for(Artifact artifact : pomInformation.getEffectiveTransitiveDependencies()) {
                     try {
-                        artifact.setJarInformation(resolver.parseJar(artifact.getIdent()).getJarInformation());
+                        artifact.setJarInformation(resolver.parseJar(artifact.getIdent(), resolutionCtx).getJarInformation());
                         depArts.put(artifact.getIdent().getGroupID() + ":" + artifact.getIdent().getArtifactID(), artifact);
                     } catch (JarResolutionException e) {
                         log.error(e);

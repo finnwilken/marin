@@ -3,7 +3,8 @@ package org.tudo.sse.multithreading;
 import akka.actor.AbstractActor;
 import akka.actor.Props;
 import akka.japi.pf.ReceiveBuilder;
-import org.tudo.sse.ArtifactFactory;
+import org.tudo.sse.model.ArtifactIdent;
+import org.tudo.sse.model.ArtifactResolutionContext;
 
 /**
  * This class is spawned in multiple threads
@@ -28,8 +29,12 @@ public class ResolverActor extends AbstractActor {
     public Receive createReceive() {
         return ReceiveBuilder.create()
                 .match(ProcessIdentifierMessage.class, message -> {
-                    message.getInstance().callResolver(message.getIdentifier());
-                    message.getInstance().analyzeArtifact(ArtifactFactory.getArtifact(message.getIdentifier()));
+                    final ArtifactIdent identifier = message.getIdentifier();
+                    final ArtifactResolutionContext ctx = message.getArtifactResolutionContext();
+
+                    message.getInstance().callResolver(identifier, ctx);
+                    message.getInstance().analyzeArtifact(ctx.getArtifact(identifier));
+
                     getSender().tell(WorkItemFinishedMessage.getInstance(), getSelf());
                 })
                 .match(ProcessLibraryMessage.class, message -> {

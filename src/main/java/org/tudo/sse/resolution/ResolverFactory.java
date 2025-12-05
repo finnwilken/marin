@@ -1,12 +1,12 @@
 package org.tudo.sse.resolution;
 
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Path;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.tudo.sse.model.ArtifactIdent;
+import org.tudo.sse.model.ResolutionContext;
 
 /**
  * This class manages the pom and jar resolver, giving a way to run one or the other.
@@ -44,10 +44,11 @@ public class ResolverFactory {
      * Resolve the POM file of the given artifact.
      *
      * @param identifier Artifact identifier to resolve
+     * @param ctx The resolution context for this run
      */
-    public void runPom(ArtifactIdent identifier) {
+    public void runPom(ArtifactIdent identifier, ResolutionContext ctx) {
         try {
-            pomResolver.resolveArtifact(identifier);
+            pomResolver.resolveArtifact(identifier, ctx);
         } catch (IOException | PomResolutionException e) {
             log.error(e);
         } catch (FileNotFoundException ignored) {}
@@ -57,10 +58,11 @@ public class ResolverFactory {
      * Resolve the JAR file of the given artifact.
      *
      * @param identifier Artifact identifier to resolve
+     * @param ctx The resolution context for this run
      */
-    public void runJar(ArtifactIdent identifier) {
+    public void runJar(ArtifactIdent identifier, ResolutionContext ctx) {
         try {
-            jarResolver.parseJar(identifier);
+            jarResolver.parseJar(identifier, ctx);
         } catch (JarResolutionException e) {
             log.error(e);
         }
@@ -70,17 +72,18 @@ public class ResolverFactory {
      * Resolve both the POM and JAR file for the given artifact.
      *
      * @param identifier Artifact identifier to resolve
+     * @param ctx The resolution context for this run
      */
-    public void runBoth(ArtifactIdent identifier) {
+    public void runBoth(ArtifactIdent identifier, ResolutionContext ctx) {
         try {
-            pomResolver.resolveArtifact(identifier);
+            pomResolver.resolveArtifact(identifier, ctx);
         } catch (IOException | PomResolutionException e) {
             log.error(e);
         } catch(FileNotFoundException ignored){}
 
         try {
             jarResolver.setOutput(false);
-            jarResolver.parseJar(identifier);
+            jarResolver.parseJar(identifier, ctx);
         } catch (JarResolutionException e) {
             log.error(e);
         }

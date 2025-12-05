@@ -2,10 +2,8 @@ package org.tudo.sse.analyses;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.tudo.sse.ArtifactFactory;
 import org.tudo.sse.CLIException;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
@@ -38,11 +36,6 @@ class MavenCentralArtifactAnalysisTest {
         assert resource != null;
         Reader targetReader = new InputStreamReader(resource);
         json = gson.fromJson(targetReader, new TypeToken<Map<String, Object>>() {}.getType());
-    }
-
-    @AfterEach
-    public void cleanup(){
-        ArtifactFactory.artifacts.clear();
     }
 
     @Test
@@ -155,6 +148,17 @@ class MavenCentralArtifactAnalysisTest {
     @Test
     @DisplayName("An analysis must adhere to pagination configurations")
     void walkPaginated() {
+
+        final List<Artifact> artifactsSeen = new ArrayList<>();
+        final MavenCentralArtifactAnalysis theAnalysis = new MavenCentralArtifactAnalysis(true, false, false, false) {
+            @Override
+            public void analyzeArtifact(Artifact current) {
+                artifactsSeen.add(current);
+            }
+        };
+
+
+
         List<Tuple2<Integer, Integer>> inputs = new ArrayList<>();
         inputs.add(new Tuple2<>(500, 10));
         inputs.add(new Tuple2<>(0, 10));
@@ -169,19 +173,27 @@ class MavenCentralArtifactAnalysisTest {
 
             try {
                 IndexIterator iterator = new IndexIterator(new URI(base), start1);
-                List<ArtifactIdent> collected1 = new ArrayList<>(analysisUnderTest.walkPaginated(take, iterator));
+                theAnalysis.walkPaginated(take, iterator);
 
-                Artifact lastOne = ArtifactFactory.getArtifact(collected1.get(collected1.size() - 1));
+                assertFalse(artifactsSeen.isEmpty());
+
+                Artifact lastOne = artifactsSeen.get(artifactsSeen.size() - 1);
+
+                assertNotNull(lastOne);
+
                 int i = 2;
                 while(lastOne.getIndexInformation().getIndex() > start2) {
-                    lastOne = ArtifactFactory.getArtifact(collected1.get(collected1.size() - i));
+                    lastOne = artifactsSeen.get(artifactsSeen.size() - i);
+                    assertNotNull(lastOne);
                     i++;
                 }
 
                 iterator = new IndexIterator(new URI(base), start2);
 
-                List<ArtifactIdent> collected2 = new ArrayList<>(analysisUnderTest.walkPaginated(1, iterator));
-                long lastOne2 = ArtifactFactory.getArtifact(collected2.get(0)).getIndexInformation().getIndex();
+                artifactsSeen.clear();
+                theAnalysis.walkPaginated(1, iterator);
+
+                long lastOne2 = artifactsSeen.get(0).getIndexInformation().getIndex();
                 assertEquals(lastOne.getIndexInformation().getIndex(), lastOne2);
             } catch (IOException | URISyntaxException e) {
                 throw new RuntimeException(e);
@@ -222,7 +234,7 @@ class MavenCentralArtifactAnalysisTest {
 
     @Test
     @DisplayName("An analysis must correctly apply CLI options when reading custom input lists")
-    void readIdentsIn() throws URISyntaxException, IOException {
+    void readIdentsIn() {
         List<String[]> cliInputs = new ArrayList<>();
         String[] args = {"--inputs", "src/main/resources/coordinates.txt"};
         cliInputs.add(args);
@@ -243,22 +255,26 @@ class MavenCentralArtifactAnalysisTest {
         int i = 0;
         for(String[] arg : cliInputs) {
             List<String> curExpected = expected.get(i);
-            MavenCentralArtifactAnalysis tester = MavenCentralAnalysisFactory.buildEmptyAnalysisWithNoRequirements();
+            List<Artifact> artifactsSeen = new ArrayList<>();
+            MavenCentralArtifactAnalysis collectorAnalysis = new MavenCentralArtifactAnalysis(false, false, false, false) {
+                @Override
+                public void analyzeArtifact(Artifact current) {
+                    artifactsSeen.add(current);
+                }
+            };
 
             // Apply arguments, check progress is stored correctly
-            tester.runAnalysis(arg);
-            Path progressFile = tester.getSetupInfo().progressOutputFile;
+            collectorAnalysis.runAnalysis(arg);
+            Path progressFile = collectorAnalysis.getSetupInfo().progressOutputFile;
             long ending = getEndingIndex(progressFile);
             assertEquals(expectedEndings[i], ending);
 
-            // Process file a second time to obtain return value
-            List<ArtifactIdent> idents = tester.processArtifactsFromInputFile();
-            assertEquals(curExpected.size(), idents.size());
+            assertEquals(curExpected.size(), artifactsSeen.size());
 
 
 
-            for(ArtifactIdent actual: idents) {
-                final String actualCoordinates = actual.getCoordinates();
+            for(Artifact actual: artifactsSeen) {
+                final String actualCoordinates = actual.getIdent().getCoordinates();
                 assert(curExpected.contains(actualCoordinates));
             }
             i++;
@@ -279,15 +295,21 @@ class MavenCentralArtifactAnalysisTest {
 
         for(int i = 0; i < singleArgs.size(); i++) {
 
-            MavenCentralArtifactAnalysis tester = MavenCentralAnalysisFactory.buildEmptyAnalysisWithPomRequirement();
+            Set<ArtifactIdent> identifiersSeen = new HashSet<>();
+            MavenCentralArtifactAnalysis tester = new MavenCentralArtifactAnalysis(false, true, false, false) {
+                @Override
+                public void analyzeArtifact(Artifact current) {
+                    identifiersSeen.add(current.ident);
+                }
+            };
 
             tester.runAnalysis(singleArgs.get(i));
-            Set<ArtifactIdent> singleResult = ArtifactFactory.artifacts.keySet();
-            cleanup();
+            Set<ArtifactIdent> singleResult = new HashSet<>(identifiersSeen);
+
+            identifiersSeen.clear();
 
             tester.runAnalysis(multiArgs.get(i));
-            Set<ArtifactIdent> multiResult = ArtifactFactory.artifacts.keySet();
-            cleanup();
+            Set<ArtifactIdent> multiResult = new HashSet<>(identifiersSeen);
 
             assertEquals(singleResult.size(), multiResult.size());
 

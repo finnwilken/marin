@@ -2,10 +2,10 @@ package org.tudo.sse.analyses;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
-import org.tudo.sse.ArtifactFactory;
 import org.tudo.sse.CLIException;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
+import org.tudo.sse.model.LibraryResolutionContext;
 import org.tudo.sse.multithreading.WorkloadIsFinalMessage;
 import org.tudo.sse.multithreading.ProcessLibraryMessage;
 import org.tudo.sse.multithreading.QueueActor;
@@ -203,6 +203,7 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
 
     private void processEntry(String ga){
         final String[] parts = ga.split(":");
+        final LibraryResolutionContext resolutionCtx = LibraryResolutionContext.newInstance(ga);
 
         if(parts.length != 2){
             log.warn("Not a valid GA tuple (need <groupID>:<artifactID>): {}", ga);
@@ -213,14 +214,14 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
         final String artifactId = parts[1];
 
         if(!config.multipleThreads){
-            process(ga, groupId, artifactId);
+            process(groupId, artifactId, resolutionCtx);
         } else {
-            final ProcessLibraryMessage msg = new ProcessLibraryMessage(() -> process(ga, groupId, artifactId));
+            final ProcessLibraryMessage msg = new ProcessLibraryMessage(() -> process(groupId, artifactId, resolutionCtx));
             queueActorRef.tell(msg, ActorRef.noSender());
         }
     }
 
-    private Void process(String ga, String groupId, String artifactId){
+    private Void process(String groupId, String artifactId, LibraryResolutionContext resolutionCtx){
 
         try { this.beforeLibraryStart(groupId, artifactId); }
         catch(Exception x){
@@ -233,22 +234,21 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
         if(identifiers == null) return null;
 
         // Resolve all information for all library releases as defined by this analysis
-        List<Artifact> libraryArtifacts = new  ArrayList<>();
         for(ArtifactIdent ident : identifiers){
-            Artifact a = ArtifactFactory.createArtifact(ident);
-            resolveDataAsNeeded(ident);
-            libraryArtifacts.add(a);
+            Artifact a = resolutionCtx.createArtifact(ident);
+            resolveDataAsNeeded(ident, resolutionCtx);
+            resolutionCtx.addLibraryArtifact(a);
         }
 
         try {
             // Call the custom analysis implementation
-            analyzeLibrary(ga, libraryArtifacts);
+            analyzeLibrary(resolutionCtx.getLibraryGA(), resolutionCtx.getLibraryArtifacts());
         } catch(Exception x){
             // Whatever the user-defined code does, we do not want to abort!
             log.error("Unknown error in analysis implementation", x);
         }
 
-        try { this.afterLibraryEnd(groupId, artifactId, libraryArtifacts); }
+        try { this.afterLibraryEnd(groupId, artifactId, resolutionCtx.getLibraryArtifacts()); }
         catch(Exception x){
             log.error("Unexpected exception in analysis lifecycle hook afterLibraryEnd for library {}, {}", groupId, artifactId, x);
         }
@@ -297,13 +297,13 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
         }
     }
 
-    private void resolveDataAsNeeded(ArtifactIdent identifier){
+    private void resolveDataAsNeeded(ArtifactIdent identifier, LibraryResolutionContext resolutionCtx){
         if(resolvePom && resolveJar) {
-            resolverFactory.runBoth(identifier);
+            resolverFactory.runBoth(identifier, resolutionCtx);
         } else if(resolvePom) {
-            resolverFactory.runPom(identifier);
+            resolverFactory.runPom(identifier, resolutionCtx);
         } else if(resolveJar) {
-            resolverFactory.runJar(identifier);
+            resolverFactory.runJar(identifier, resolutionCtx);
         }
     }
 

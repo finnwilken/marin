@@ -2,11 +2,12 @@ package org.tudo.sse.analyses;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
-import org.tudo.sse.ArtifactFactory;
 import org.tudo.sse.CLIException;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.index.IndexInformation;
+import org.tudo.sse.model.ArtifactResolutionContext;
+import org.tudo.sse.model.ResolutionContext;
 import org.tudo.sse.multithreading.ProcessIdentifierMessage;
 import org.tudo.sse.multithreading.WorkloadIsFinalMessage;
 import org.tudo.sse.resolution.ResolverFactory;
@@ -19,9 +20,7 @@ import org.tudo.sse.utils.MavenCentralRepository;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 
 /**
  * The MavenCentralAnalysis enables analysis of artifacts on the maven central repository for jobs of any size.
@@ -187,11 +186,11 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
 
     }
 
-    private void processIndex(Artifact current) {
+    private void processIndex(Artifact current, ArtifactResolutionContext ctx) {
         if(this.artifactConfig.multipleThreads) {
-            queueActorRef.tell(new ProcessIdentifierMessage(current.getIdent(), this), ActorRef.noSender());
+            queueActorRef.tell(new ProcessIdentifierMessage(ctx, this), ActorRef.noSender());
         } else {
-            callResolver(current.getIdent());
+            callResolver(current.getIdent(), ctx);
             analyzeArtifact(current);
         }
     }
@@ -218,11 +217,15 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
                 }
             }
 
+            final ArtifactResolutionContext ctx = ArtifactResolutionContext.newInstance(current.getIdent());
+
             if(resolveIndex){
-                final Artifact artifact = ArtifactFactory.createArtifact(current);
-                processIndex(artifact);
+                final Artifact currentArtifact = ctx.createArtifact(current.getIdent());
+                currentArtifact.setIndexInformation(current);
+
+                processIndex(currentArtifact, ctx);
             } else {
-                processIndexIdentifier(current.getIdent());
+                processIndexIdentifier(current.getIdent(), ctx);
             }
 
             writePositionIfNeeded();
@@ -241,12 +244,10 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
      *
      * @param take number of artifacts from the starting point to capture
      * @param indexIterator an iterator for traversing the maven central index
-     * @return a list of artifact identifiers processed by this method
      * @see ArtifactIdent
      * @throws IOException when there is an issue opening a file
      */
-    List<ArtifactIdent> walkPaginated(long take, IndexIterator indexIterator) throws IOException {
-        final List<ArtifactIdent> artifactIdents = new ArrayList<>();
+    void walkPaginated(long take, IndexIterator indexIterator) throws IOException {
         long entriesTaken = 0L;
 
         while(indexIterator.hasNext() && entriesTaken < take) {
@@ -261,14 +262,16 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
                 }
             }
 
-            if(resolveIndex){
-                final Artifact artifact = ArtifactFactory.createArtifact(current);
-                processIndex(artifact);
-            } else {
-                processIndexIdentifier(current.getIdent());
-            }
+            final ArtifactResolutionContext ctx = ArtifactResolutionContext.newInstance(current.getIdent());
 
-            artifactIdents.add(current.getIdent());
+            if(resolveIndex){
+                final Artifact currentArtifact = ctx.createArtifact(current.getIdent());
+                currentArtifact.setIndexInformation(current);
+
+                processIndex(currentArtifact, ctx);
+            } else {
+                processIndexIdentifier(current.getIdent(), ctx);
+            }
 
             writePositionIfNeeded();
         }
@@ -279,22 +282,18 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
             log.info("Processed a total of {} entries.", entriesTaken);
 
         indexIterator.closeReader();
-        return artifactIdents;
     }
 
     /**
-     * Iterates over all indexes in the maven central index.
-     * It collects a list of artifact identifiers that are within the range of since and until.
+     * Invokes analysis configuration for all artifact identifiers in the date window defined by given boundaries.
      *
      * @param since lower bound of dates of artifacts to collect
      * @param until upper bound of dates of artifacts to collect
      * @param indexIterator an iterator for traversing the maven central index
-     * @return a list of artifact identifiers processed by this method
      * @see ArtifactIdent
      * @throws IOException when there is an issue opening a file
      */
-    List<ArtifactIdent> walkDates(long since, long until, IndexIterator indexIterator) throws IOException {
-        final List<ArtifactIdent> artifactIdents = new ArrayList<>();
+    void walkDates(long since, long until, IndexIterator indexIterator) throws IOException {
         long entriesTaken = 0L;
 
         long currentToSince;
@@ -314,14 +313,17 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
                     }
                 }
 
-                if(resolveIndex){
-                    final Artifact artifact = ArtifactFactory.createArtifact(current);
-                    processIndex(artifact);
-                } else {
-                    processIndexIdentifier(current.getIdent());
-                }
+                final ArtifactResolutionContext ctx = ArtifactResolutionContext.newInstance(current.getIdent());
 
-                artifactIdents.add(current.getIdent());
+                if(resolveIndex){
+                    // If we want to retain index information, build an artifact and attach it
+                    final Artifact currentArtifact = ctx.createArtifact(current.getIdent());
+                    currentArtifact.setIndexInformation(current);
+
+                    processIndex(currentArtifact, ctx);
+                } else {
+                    processIndexIdentifier(current.getIdent(), ctx);
+                }
             }
 
             writePositionIfNeeded();
@@ -333,26 +335,24 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
             log.info("Processed a total of {} entries.", entriesTaken);
 
         indexIterator.closeReader();
-        return artifactIdents;
     }
 
-    private void processIndexIdentifier(ArtifactIdent ident) {
+    private void processIndexIdentifier(ArtifactIdent ident, ArtifactResolutionContext ctx) {
         if(this.artifactConfig.multipleThreads){
-            queueActorRef.tell(new ProcessIdentifierMessage(ident, this), ActorRef.noSender());
+            queueActorRef.tell(new ProcessIdentifierMessage(ctx, this), ActorRef.noSender());
         } else {
-            callResolver(ident);
-            if(ArtifactFactory.getArtifact(ident) != null) {
-                analyzeArtifact(ArtifactFactory.getArtifact(ident));
+            callResolver(ident, ctx);
+            final Artifact artifact = ctx.getArtifact(ident);
+            if(artifact != null) {
+                analyzeArtifact(artifact);
             }
         }
     }
 
     /**
      * Reads in identifiers from a file, using the configuration passed into it.
-     *
-     * @return a list of identifiers collected from the file
      */
-    List<ArtifactIdent> processArtifactsFromInputFile() {
+    void processArtifactsFromInputFile() {
         final Iterator<ArtifactIdent> fileIterator = new FileBasedArtifactIterator(this.artifactConfig.inputListFile);
 
         // Restore from progress file if available
@@ -371,7 +371,6 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
         if(!fileIterator.hasNext())
             log.warn("No more contents left to process in input file: {}", this.artifactConfig.inputListFile);
 
-        final List<ArtifactIdent> identifiers = new ArrayList<>();
         final boolean takeLimited = this.artifactConfig.take >= 0;
 
         long entriesTaken = 0L;
@@ -388,8 +387,9 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
             entriesTaken += 1L;
 
             if(current != null){
-                identifiers.add(current);
-                processIndexIdentifier(current);
+                final ArtifactResolutionContext resolutionCtx = ArtifactResolutionContext.newInstance(current);
+
+                processIndexIdentifier(current, resolutionCtx);
             }
         }
 
@@ -401,21 +401,23 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
             // Write position one final time - in multithreaded mode the queue worker will take care of this
             writePosition();
         }
-
-        return identifiers;
     }
 
     /**
      * Invokes all resolvers as defined by the analysis configuration to enrich the given artifact identifier.
      * @param identifier Artifact identifier to enrich
+     * @param ctx The current resolution context
      */
-    public void callResolver(ArtifactIdent identifier) {
+    public void callResolver(ArtifactIdent identifier, ResolutionContext ctx) {
         if(resolvePom && resolveJar) {
-            resolverFactory.runBoth(identifier);
+            resolverFactory.runBoth(identifier, ctx);
         } else if(resolvePom) {
-            resolverFactory.runPom(identifier);
+            resolverFactory.runPom(identifier, ctx);
         } else if(resolveJar) {
-            resolverFactory.runJar(identifier);
+            resolverFactory.runJar(identifier, ctx);
+        } else {
+            // If no sources are configured, we still want to have an "empty" artifact so it can be returned later
+            ctx.createArtifact(identifier);
         }
     }
 

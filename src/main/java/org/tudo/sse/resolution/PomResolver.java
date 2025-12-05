@@ -11,11 +11,11 @@ import org.eclipse.aether.util.version.GenericVersionScheme;
 import org.eclipse.aether.version.InvalidVersionSpecificationException;
 import org.eclipse.aether.version.Version;
 import org.eclipse.aether.version.VersionRange;
-import org.tudo.sse.ArtifactFactory;
 import org.tudo.sse.model.*;
 import org.tudo.sse.model.pom.License;
 import org.tudo.sse.model.pom.PomInformation;
 import org.tudo.sse.model.pom.RawPomFeatures;
+import org.tudo.sse.model.ResolutionContext;
 import org.tudo.sse.resolution.releases.DefaultMavenReleaseListProvider;
 import org.tudo.sse.resolution.releases.IReleaseListProvider;
 import org.tudo.sse.utils.MavenCentralRepository;
@@ -150,17 +150,18 @@ public class PomResolver {
      * This method resolves all artifacts given a list of identifiers.
      *
      * @param idents list of identifiers to resolve
+     * @param ctx The resolution context to use for caching artifacts
      * @return list of resolved artifacts
      * @see Artifact
      */
-    public List<Artifact> resolveArtifacts(List<ArtifactIdent> idents) {
+    public List<Artifact> resolveArtifacts(List<ArtifactIdent> idents, ResolutionContext ctx) {
         List<Artifact> poms = new ArrayList<>();
 
         log.info("There are {} identifiers to resolve", idents.size());
         int count =0;
         for(ArtifactIdent ident : idents) {
             try {
-                poms.add(resolveArtifact(ident));
+                poms.add(resolveArtifact(ident, ctx));
             } catch(PomResolutionException e) {
                 log.error(e);
             } catch ( IOException e) {
@@ -182,13 +183,14 @@ public class PomResolver {
      * This method given an Artifact Identifier, resolves a single artifact (raw features, parent, imports, dependencies, and transitive dependencies).
      *
      * @param identifier id for the pom artifact to resolve
+     * @param ctx The resolution context to use for caching artifacts
      * @return an artifact with resolved PomInformation
      * @see PomInformation
      * @throws FileNotFoundException When the POM file does not exist for the given artifact
      * @throws IOException If connection errors occur
      * @throws PomResolutionException If the POM resolution process fails due to invalid file contents
      */
-    public Artifact resolveArtifact(ArtifactIdent identifier) throws FileNotFoundException, IOException, PomResolutionException {
+    public Artifact resolveArtifact(ArtifactIdent identifier, ResolutionContext ctx) throws FileNotFoundException, IOException, PomResolutionException {
         Map<ArtifactIdent, Artifact> alrEncountered = new HashMap<>();
         if(output) {
             try(InputStream inputStream = MavenRepo.openPomFileInputStream(identifier)){
@@ -202,12 +204,12 @@ public class PomResolver {
             }
         }
 
-        Artifact toReturn = processArtifact(identifier);
+        Artifact toReturn = processArtifact(identifier, ctx);
         toReturn.getPomInformation().setResolvedDependencies(resolveDependencies(toReturn.getPomInformation()));
 
         if(resolveTransitives) {
-            resolveAllTransitives(toReturn, alrEncountered, null);
-            resolveEffectiveTransitives(toReturn);
+            resolveAllTransitives(toReturn, alrEncountered, null, ctx);
+            resolveEffectiveTransitives(toReturn, ctx);
         }
         return toReturn;
     }
@@ -341,15 +343,18 @@ public class PomResolver {
     /**
      * This method handles resolving an artifact via raw Pom information and parent and dependency resolution
      * @param identifier used to retrieve the pom artifact from the maven central repository
+     * @param ctx The resolution context to use for caching artifacts
      * @return an artifact with resolved rawPomFeatures, parent, and import information
      * @throws PomResolutionException If the POM resolution process fails due to invalid file contents
      * @throws FileNotFoundException When the POM file does not exist for the given artifact
      * @throws IOException If connection errors occur
      */
-    public Artifact processArtifact(ArtifactIdent identifier) throws PomResolutionException, FileNotFoundException, IOException {
-        if(ArtifactFactory.getArtifact(identifier) != null && Objects.requireNonNull(ArtifactFactory.getArtifact(identifier)).getPomInformation() != null) {
-            return ArtifactFactory.getArtifact(identifier);
-        }
+    public Artifact processArtifact(ArtifactIdent identifier, ResolutionContext ctx) throws PomResolutionException, FileNotFoundException, IOException {
+        final Artifact currentArtifact = ctx.createArtifact(identifier);
+
+        // Only build pom information if it is not already present for the current resolution context
+        if(currentArtifact.hasPomInformation())
+            return currentArtifact;
 
         PomInformation pomInformation = new PomInformation(identifier);
 
@@ -371,16 +376,19 @@ public class PomResolver {
         pomInformation.setRawPomFeatures(rawPomFeatures);
 
         if(pomInformation.getRawPomFeatures() != null) {
-            getAllRelevantFiles(pomInformation);
+            getAllRelevantFiles(pomInformation, ctx);
         }
 
-        return ArtifactFactory.createArtifact(pomInformation);
+        // Finally set pom information for current artifact, then return
+        currentArtifact.setPomInformation(pomInformation);
+
+        return currentArtifact;
     }
 
-    private void getAllRelevantFiles(PomInformation pomInformation) throws PomResolutionException, FileNotFoundException, IOException {
+    private void getAllRelevantFiles(PomInformation pomInformation, ResolutionContext ctx) throws PomResolutionException, FileNotFoundException, IOException {
         if(pomInformation.getRawPomFeatures().getParent() != null) {
             try {
-                pomInformation.setParent(processArtifact(pomInformation.getRawPomFeatures().getParent()));
+                pomInformation.setParent(processArtifact(pomInformation.getRawPomFeatures().getParent(), ctx));
             } catch(PomResolutionException e) {
                 log.error("Failed to resolve parent: {}", e.getMessage());
             } catch (FileNotFoundException ignored) {}
@@ -392,7 +400,7 @@ public class PomResolver {
         }
 
         if(pomInformation.getRawPomFeatures().getDependencyManagement() != null) {
-            pomInformation.setImports(resolveImports(pomInformation.getRawPomFeatures().getDependencyManagement(), pomInformation));
+            pomInformation.setImports(resolveImports(pomInformation.getRawPomFeatures().getDependencyManagement(), pomInformation, ctx));
         }
     }
 
@@ -400,19 +408,20 @@ public class PomResolver {
      * Resolves import scope dependencies and returns their corresponding artifacts.
      * @param managedDependencies list of managed dependencies from the rawPomFeatures, to be looked through for an import
      * @param info the current information object
+     * @param ctx The resolution context to use for caching artifacts
      * @return a list of imported artifacts
      * @throws PomResolutionException handles errors that arise with pom resolution
      * @throws FileNotFoundException handles errors with not finding a file
      * @throws IOException handles errors with opening and closing files
      */
-    public List<Artifact> resolveImports(List<org.tudo.sse.model.pom.Dependency> managedDependencies, PomInformation info) throws PomResolutionException, FileNotFoundException, IOException {
+    public List<Artifact> resolveImports(List<org.tudo.sse.model.pom.Dependency> managedDependencies, PomInformation info, ResolutionContext ctx) throws PomResolutionException, FileNotFoundException, IOException {
         ArrayList<Artifact> imports = new ArrayList<>();
 
         for(org.tudo.sse.model.pom.Dependency dependency: managedDependencies) {
             try {
                 if(dependency.getScope() != null && dependency.getScope().equals("import")) {
                     dependency = resolveVersion(dependency, info);
-                    Artifact temp = processArtifact(dependency.getIdent());
+                    Artifact temp = processArtifact(dependency.getIdent(), ctx);
                     if(temp != null) {
                         imports.add(temp);
                     }
@@ -801,10 +810,11 @@ public class PomResolver {
      * This method resolves all the transitive dependencies of a given artifact. This is done recursively working with resolveTransitives and the recursiveHandler.
      *
      * @param toResolve the current artifact transitive dependencies are being resolved for.
+     * @param ctx The resolution context to use for caching artifacts
      * @throws IOException thrown when there's an issue opening the pom for an artifact
      */
-    public void resolveAllTransitives(Artifact toResolve) throws IOException {
-        resolveAllTransitives(toResolve, new HashMap<>(), null);
+    public void resolveAllTransitives(Artifact toResolve, ResolutionContext ctx) throws IOException {
+        resolveAllTransitives(toResolve, new HashMap<>(), null, ctx);
     }
 
     /**
@@ -813,9 +823,10 @@ public class PomResolver {
      * @param current the current artifact transitive dependencies are being resolved for.
      * @param alrEncountered a map of dependencies that have already been resolved to avoid double resolutions
      * @param exclusions a Set of G:A values to not include in resolution
+     * @param ctx The resolution context to use for caching artifacts
      * @throws IOException thrown when there's an issue opening the pom for an artifact
      */
-    public void resolveAllTransitives(Artifact current, Map<ArtifactIdent, Artifact> alrEncountered, Set<String> exclusions) throws IOException {
+    public void resolveAllTransitives(Artifact current, Map<ArtifactIdent, Artifact> alrEncountered, Set<String> exclusions, ResolutionContext ctx) throws IOException {
         List<Artifact> transitives = new ArrayList<>();
         for (org.tudo.sse.model.pom.Dependency dependency : current.getPomInformation().getResolvedDependencies()) {
             if(exclusions == null || !exclusions.contains(dependency.getIdent().getGA())) {
@@ -825,7 +836,7 @@ public class PomResolver {
 
                 if (dependencyRelevant && !alrEncountered.containsKey(dependency.getIdent())) {
                     alrEncountered.put(dependency.getIdent(), null);
-                    Artifact transitive = resolveTransitives(current, dependency, alrEncountered, dependency.getExclusions());
+                    Artifact transitive = resolveTransitives(current, dependency, alrEncountered, dependency.getExclusions(), ctx);
                     if (transitive != null) {
                         if(transitive.getRelocation() != null) {
                             alrEncountered.remove(dependency.getIdent());
@@ -844,32 +855,40 @@ public class PomResolver {
         current.getPomInformation().setAllTransitiveDependencies(transitives);
     }
 
-    private Artifact resolveTransitives(Artifact current, org.tudo.sse.model.pom.Dependency toResolve, Map<ArtifactIdent, Artifact> alrEncountered, Set<String> exclusions) throws IOException {
+    private Artifact resolveTransitives(Artifact current,
+                                        org.tudo.sse.model.pom.Dependency toResolve,
+                                        Map<ArtifactIdent, Artifact> alrEncountered,
+                                        Set<String> exclusions,
+                                        ResolutionContext ctx) throws IOException {
         try {
-            return recursiveResolver(toResolve.getIdent(), alrEncountered, exclusions);
+            return recursiveResolver(toResolve.getIdent(), alrEncountered, exclusions, ctx);
         } catch(FileNotFoundException | PomResolutionException e) {
             if(!current.getPomInformation().getRawPomFeatures().getRepositories().isEmpty()) {
-                return resolveFromSecondaryRepo(current.getPomInformation().getRawPomFeatures().getRepositories(), toResolve, alrEncountered, exclusions);
+                return resolveFromSecondaryRepo(current.getPomInformation().getRawPomFeatures().getRepositories(), toResolve, alrEncountered, exclusions, ctx);
             }
             if(!(e instanceof FileNotFoundException)) log.error(e);
             return null;
         }
     }
 
-    private Artifact recursiveResolver(ArtifactIdent identifier, Map<ArtifactIdent, Artifact> alrEncountered, Set<String> exclusions) throws FileNotFoundException, IOException, PomResolutionException {
-        Artifact current = processArtifact(identifier);
+    private Artifact recursiveResolver(ArtifactIdent identifier, Map<ArtifactIdent, Artifact> alrEncountered, Set<String> exclusions, ResolutionContext ctx) throws FileNotFoundException, IOException, PomResolutionException {
+        Artifact current = processArtifact(identifier, ctx);
         current.getPomInformation().setResolvedDependencies(resolveDependencies(current.getPomInformation()));
-        resolveAllTransitives(current, alrEncountered, exclusions);
+        resolveAllTransitives(current, alrEncountered, exclusions, ctx);
         return current;
     }
 
-    private Artifact resolveFromSecondaryRepo(List<String> repos, org.tudo.sse.model.pom.Dependency toResolve, Map<ArtifactIdent, Artifact> alrEncountered, Set<String> exclusions) {
+    private Artifact resolveFromSecondaryRepo(List<String> repos,
+                                              org.tudo.sse.model.pom.Dependency toResolve,
+                                              Map<ArtifactIdent, Artifact> alrEncountered,
+                                              Set<String> exclusions,
+                                              ResolutionContext ctx) {
         int i = 0;
         Artifact toReturn = null;
         while(i < repos.size() && toReturn == null) {
             toResolve.getIdent().setRepository(repos.get(i));
             try {
-                toReturn = recursiveResolver(toResolve.getIdent(), alrEncountered, exclusions);
+                toReturn = recursiveResolver(toResolve.getIdent(), alrEncountered, exclusions, ctx);
             } catch (IOException | PomResolutionException e) {
                 log.error(e);
             } catch (FileNotFoundException ignored) {}
@@ -882,8 +901,9 @@ public class PomResolver {
     /**
      * This method attempts to get all effective transitive dependencies, resolving conflicts, and removing duplicates.
      * @param toResolve the artifact for which to resolve the effective transitive dependencies
+     * @param ctx The resolution context to use for caching artifacts
      */
-    public void resolveEffectiveTransitives(Artifact toResolve) {
+    public void resolveEffectiveTransitives(Artifact toResolve, ResolutionContext ctx) {
         // Can only resolve dependencies if POM info is present.
         // IMPROVE: Do we want to load POM info on demand?
         if(!toResolve.hasPomInformation()){
@@ -895,7 +915,7 @@ public class PomResolver {
         // If "normal" transitive dependencies have not been computed yet, we try to do that on demand
         if(allTransitive == null){
             try {
-                this.resolveAllTransitives(toResolve, new HashMap<>(), null);
+                this.resolveAllTransitives(toResolve, new HashMap<>(), null, ctx);
                 allTransitive = toResolve.getPomInformation().getAllTransitiveDependencies();
             } catch (IOException iox){
                 throw new IllegalStateException("Failed to compute transitive dependencies on demand", iox);
@@ -937,8 +957,9 @@ public class PomResolver {
         }
 
         for(Map.Entry<String,ArtifactIdent> entry : foundGA.entrySet()) {
-            toReturn.add(ArtifactFactory.getArtifact(entry.getValue()));
+            toReturn.add(ctx.getArtifact(entry.getValue()));
         }
+
         toResolve.getPomInformation().setEffectiveTransitiveDependencies(toReturn);
         toResolve.getPomInformation().setTransitiveConflicts(conflicts);
     }

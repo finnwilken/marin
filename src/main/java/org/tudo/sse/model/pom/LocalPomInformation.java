@@ -4,12 +4,12 @@ import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.tudo.sse.model.*;
+import org.tudo.sse.model.ResolutionContext;
 import org.tudo.sse.resolution.PomResolutionException;
 import org.tudo.sse.resolution.PomResolver;
 
 import java.io.*;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -58,14 +58,14 @@ public class LocalPomInformation extends PomInformation {
     public void resolveLocalPom(PomResolver resolver) throws IOException, XmlPullParserException {
         if(pomStream != null) {
             resolveLocalFile(resolver, this.pomStream);
-        } else {
+        } else if(pomPath != null) {
             try (FileInputStream is = new FileInputStream(this.pomPath.toFile())) {
                 resolveLocalFile(resolver, is);
             }
         }
 
         if(this.loadTransitives){
-            resolveParentAndImport(resolver);
+            resolveParentAndImport(resolver, ResolutionContext.createAnonymousContext());
             resolveDependencies(resolver);
         }
 
@@ -167,10 +167,10 @@ public class LocalPomInformation extends PomInformation {
      * @see PomResolver
      * @param resolver the resolver used to resolve the parents and imports of the local pom
      */
-    private void resolveParentAndImport(PomResolver resolver) {
+    private void resolveParentAndImport(PomResolver resolver, ResolutionContext ctx) {
         if(this.rawPomFeatures.getParent() != null) {
             try {
-                this.parent = resolver.processArtifact(this.rawPomFeatures.getParent());
+                this.parent = resolver.processArtifact(this.rawPomFeatures.getParent(), ctx);
             } catch (PomResolutionException | org.tudo.sse.resolution.FileNotFoundException | IOException e) {
                 throw new RuntimeException(e);
             }
@@ -178,7 +178,7 @@ public class LocalPomInformation extends PomInformation {
 
         if(this.rawPomFeatures.getDependencyManagement() != null) {
             try {
-                this.imports = resolver.resolveImports(this.rawPomFeatures.getDependencyManagement(), this);
+                this.imports = resolver.resolveImports(this.rawPomFeatures.getDependencyManagement(), this, ctx);
             } catch (PomResolutionException | org.tudo.sse.resolution.FileNotFoundException | IOException e) {
                 throw new RuntimeException(e);
             }
