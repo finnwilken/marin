@@ -1,9 +1,5 @@
 package org.tudo.sse.multithreading;
 
-
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import org.apache.pekko.actor.typed.ActorRef;
 import org.apache.pekko.actor.typed.Behavior;
 import org.apache.pekko.actor.typed.PostStop;
@@ -24,7 +20,6 @@ public class ResolverActor extends AbstractBehavior<WorkItem> {
 
     private static final AtomicInteger idCounter = new AtomicInteger(0);
 
-    private final Logger log = LogManager.getLogger(getClass());
     private final int id =  idCounter.getAndIncrement();
     private final ActorRef<WorkItem> queueActor;
 
@@ -37,11 +32,11 @@ public class ResolverActor extends AbstractBehavior<WorkItem> {
 
         this.queueActor = queueActor;
 
-        log.info("Created resolver actor #{}", id);
+        ctx.getLog().info("Created resolver actor #{}", id);
     }
 
     private Behavior<WorkItem> onPostStop(){
-        log.info("Stopped resolver actor #{}", id);
+        getContext().getLog().info("Stopped resolver actor #{}", id);
         return this;
     }
 

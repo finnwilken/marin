@@ -151,6 +151,30 @@ public class JavaDocImplementation extends MavenCentralArtifactAnalysis {
 }
 ```
 
+## Logging
+MARIN relies on `slf4j-api` for logging purposes. You will need an SLF4J backend like `ch.qos.logback:logback-classic` on your path to enable and configure logging.
+Note that MARIN uses Apache Pekko Actors for multithreaded processing. If your analysis implementations perform a lot of logging operations, we suggest you [use an async appender](https://pekko.apache.org/docs/pekko/current/typed/logging.html#logback) as to not block multithreaded execution.
+The following example for `logback.xml` demonstrates how to set up an asnyc appender that logs to the console:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>[%date{ISO8601}] [%level] [%logger] - %msg %n</pattern>
+        </encoder>
+    </appender>
+    <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>8192</queueSize>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="CONSOLE" />
+    </appender>
+    <root level="INFO">
+        <appender-ref ref="ASYNC"/>
+    </root>
+</configuration>
+```
+Depending on your implementation's logging output and logback queue size for, some log messages may be dropped.
+
 ## IndexWalker
 This part of the interface enables an easy traversal and collection of information from the Maven Central Index. This relies on the IndexIterator which traverses the index storing the values of artifacts with the same identifier in a single artifact objects as a list of packages (representation of each unique artifact under the same identifier).
 

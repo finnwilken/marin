@@ -1,8 +1,8 @@
 package org.tudo.sse.utils;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.apache.maven.index.reader.IndexReader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tudo.sse.IndexWalker;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.index.Package;
@@ -31,7 +31,7 @@ public class IndexIterator implements Iterator<IndexInformation> {
     private IndexInformation nextArtifact;
     private boolean prevHasNext;
 
-    private static final Logger log = LogManager.getLogger(IndexIterator.class);
+    private static final Logger log = LoggerFactory.getLogger(IndexIterator.class);
 
 
     /**

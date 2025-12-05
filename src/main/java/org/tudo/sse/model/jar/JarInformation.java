@@ -1,12 +1,12 @@
 package org.tudo.sse.model.jar;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.opalj.br.analyses.Project;
 import org.opalj.br.package$;
 import org.opalj.br.reader.Java17Framework$;
 import org.opalj.br.reader.Java17LibraryFramework;
 import org.opalj.br.reader.Java17LibraryFramework$;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.ArtifactInformation;
 import org.tudo.sse.resolution.FileNotFoundException;
@@ -34,7 +34,7 @@ import java.util.jar.JarInputStream;
  */
 public class JarInformation extends ArtifactInformation {
 
-    private static final Logger log = LogManager.getLogger(JarInformation.class);
+    private static final Logger log = LoggerFactory.getLogger(JarInformation.class);
 
     private long codesize;
     private long numClassFiles;
@@ -218,7 +218,7 @@ public class JarInformation extends ArtifactInformation {
      * @throws IOException If reading the JAR file fails
      */
     public Project<String> getOpalProject() throws IOException {
-        return getOpalProject(MarinOpalLogger.newInfoLogger(LogManager.getLogger("[OPAL-Project]")));
+        return getOpalProject(MarinOpalLogger.newInfoLogger(LoggerFactory.getLogger("[OPAL-Project]")));
     }
 
     /**
@@ -276,7 +276,7 @@ public class JarInformation extends ArtifactInformation {
      */
     public Project<String> getOpalProject(Set<ArtifactIdent> dependencies, boolean fullyLoadLibraries, boolean breakOnFailure) throws IOException {
         return getOpalProject(dependencies, fullyLoadLibraries, breakOnFailure,
-                MarinOpalLogger.newInfoLogger(LogManager.getLogger("[OPAL-Project]")));
+                MarinOpalLogger.newInfoLogger(LoggerFactory.getLogger("[OPAL-Project]")));
     }
 
     /**

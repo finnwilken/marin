@@ -1,10 +1,9 @@
 package org.tudo.sse;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import java.io.IOException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.index.IndexInformation;
@@ -32,7 +31,7 @@ public class IndexWalker implements Iterable<IndexInformation> {
     private boolean resetIterator;
     private final URI base;
 
-    private static final Logger log = LogManager.getLogger(IndexWalker.class);
+    private static final Logger log = LoggerFactory.getLogger(IndexWalker.class);
 
     /**
      * Creates a new IndexWalker with the given repository base URI.

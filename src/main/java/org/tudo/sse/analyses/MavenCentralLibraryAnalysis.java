@@ -279,7 +279,7 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
 
             try { this.onVersionListError(groupId, artifactId, x); }
             catch(Exception inner) {
-                log.warn("Unexcepted exception in analysis lifecycle hook onVersionListError for library {}:{}, {}", groupId, artifactId, x);
+                log.warn("Unexcepted exception in analysis lifecycle hook onVersionListError for library {}:{}", groupId, artifactId, x);
             }
 
             return null;

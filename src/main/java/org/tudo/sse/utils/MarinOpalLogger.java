@@ -1,8 +1,8 @@
 package org.tudo.sse.utils;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.opalj.log.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Acts as a logging bridge between Log4j and OPAL. A MarinOpalLogger instance can be passed when creating an OPAL
@@ -20,7 +20,7 @@ public class MarinOpalLogger implements OPALLogger {
      * Create a new instance that creates a new underlying Log4j backend.
      */
     public MarinOpalLogger(){
-        this.internalLog = LogManager.getLogger(MarinOpalLogger.class);
+        this.internalLog = LoggerFactory.getLogger(MarinOpalLogger.class);
     }
 
     /**
@@ -90,7 +90,7 @@ public class MarinOpalLogger implements OPALLogger {
         } else if(message.level() == Info$.MODULE$ && infoEnabled){
             internalLog.info(message.message());
         } else if(message.level() == Fatal$.MODULE$){
-            internalLog.fatal(message.message());
+            internalLog.error("[FATAL] {}", message.message());
         }
     }
 

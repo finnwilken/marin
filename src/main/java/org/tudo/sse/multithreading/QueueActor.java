@@ -1,7 +1,5 @@
 package org.tudo.sse.multithreading;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.apache.pekko.actor.typed.ActorRef;
 import org.apache.pekko.actor.typed.Behavior;
 import org.apache.pekko.actor.typed.PostStop;
@@ -36,9 +34,15 @@ public class QueueActor extends AbstractBehavior<WorkItem> {
     private long lastProgressSaved = 0L;
     private final Path progressOutputFilePath;
 
-    private static final Logger log = LogManager.getLogger(QueueActor.class);
 
-
+    /**
+     * Creates a new queue actor behavior using the given configuration values
+     * @param maxNumberOfResolvers Number of ResolverActor instances that will process jobs
+     * @param initialWorkItemPosition The number of work items that have been skipped due to progress restore or skip
+     * @param progressSaveInterval The number of completed work items after which to save progress
+     * @param progressOutputFilePath The file path to which to write progress to
+     * @return A new QueueActor behavior
+     */
     public static Behavior<WorkItem> create(int maxNumberOfResolvers,
                                             long initialWorkItemPosition,
                                             long progressSaveInterval,
@@ -50,6 +54,7 @@ public class QueueActor extends AbstractBehavior<WorkItem> {
 
     /**
      * Creates a new processing queue with the given number of actors and the given actor system.
+     * @param ctx This actor's context
      * @param maxNumberOfResolvers Number of ResolverActor instances that will process jobs
      * @param initialWorkItemPosition The number of work items that have been skipped due to progress restore or skip
      * @param progressSaveInterval The number of completed work items after which to save progress
@@ -70,11 +75,11 @@ public class QueueActor extends AbstractBehavior<WorkItem> {
         this.progressOutputFilePath = progressOutputFilePath;
         this.workItemsCompleted.set(initialWorkItemPosition);
 
-        log.info("Created queue actor");
+        ctx.getLog().info("Created queue actor");
     }
 
     private Behavior<WorkItem> onPostStop() {
-        log.info("Stopped QueueActor");
+        getContext().getLog().info("Stopped QueueActor");
         return this;
     }
 
@@ -102,14 +107,14 @@ public class QueueActor extends AbstractBehavior<WorkItem> {
                             WorkItem workItem = jobQueue.poll();
                             sender.tell(workItem);
                             if(jobQueue.size() % 10 == 0)
-                                log.trace("Distributed a job, queue size {}", jobQueue.size());
+                                getContext().getLog().trace("Distributed a job, queue size {}", jobQueue.size());
                         } else {
                             synchronized (currentNumberOfResolvers){
                                 if(indexFinished && currentNumberOfResolvers.get() == 1){
-                                    log.trace("Shutting down queue actor...");
+                                    getContext().getLog().trace("Shutting down queue actor...");
                                     return Behaviors.stopped();
                                 } else {
-                                    log.trace("Stopping a ResolverActor ...");
+                                    getContext().getLog().trace("Stopping a ResolverActor ...");
                                     sender.tell(WorkloadIsFinalMessage.getInstance());
                                     currentNumberOfResolvers.decrementAndGet();
                                 }

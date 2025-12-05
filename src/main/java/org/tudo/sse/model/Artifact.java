@@ -1,7 +1,7 @@
 package org.tudo.sse.model;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tudo.sse.model.index.IndexInformation;
 import org.tudo.sse.model.jar.*;
 import org.tudo.sse.model.pom.PomInformation;
@@ -21,7 +21,7 @@ public class Artifact {
      * The identifier object for the artifact.
      */
     public final ArtifactIdent ident;
-    private static final Logger log = LogManager.getLogger(Artifact.class);
+    private static final Logger log = LoggerFactory.getLogger(Artifact.class);
 
     /**
      * A secondary identifier, for if its pom information has been moved on the maven central repository.
@@ -153,7 +153,7 @@ public class Artifact {
                         artifact.setJarInformation(resolver.parseJar(artifact.getIdent(), resolutionCtx).getJarInformation());
                         depArts.put(artifact.getIdent().getGroupID() + ":" + artifact.getIdent().getArtifactID(), artifact);
                     } catch (JarResolutionException e) {
-                        log.error(e);
+                        log.error("Failed to resolve transitive dependency: {}", artifact.getIdent(), e);
                     }
                 }
             }
