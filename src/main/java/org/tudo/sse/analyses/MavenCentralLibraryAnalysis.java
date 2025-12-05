@@ -24,11 +24,18 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+/**
+ * Base class for analyses that process <b>libraries</b> hosted on Maven Central. For each library, all artifacts (releases)
+ * are aggregated and enriched with pom / JAR information as specified by the implementing class.
+ */
 public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
 
     private final IReleaseListProvider releaseListProvider;
     private final ResolverFactory resolverFactory;
 
+    /**
+     * The configuration for this analysis instance. Only available after runAnalysis has been called.
+     */
     protected CommonConfigParser.CommonConfig config;
 
     private ActorRef queueActorRef;
@@ -158,8 +165,10 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
     /**
      * Analysis lifecycle hook that is executed before a library is being processed, i.e., before any releases are
      * discovered.
+     * <p>
+     * <b>Note:</b>This method may be called concurrently by multiple threads if the analysis uses parallel execution
+     * </p>
      *
-     * @implNote This method may be called concurrently by multiple threads if the analysis uses parallel execution
      *
      * @param groupId The library's group ID
      * @param artifactId The library's artifact ID
@@ -171,8 +180,9 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
     /**
      * Analysis lifecycle hook that is executed after a library has been processed, i.e., after all releases have been
      * discovered and the analysis implementation has been executed.
-     *
-     * @implNote This method may be called concurrently by multiple threads if the analysis uses parallel execution
+     * <p>
+     * <b>Note:</b>This method may be called concurrently by multiple threads if the analysis uses parallel execution
+     * </p>
      *
      * @param groupId The library's group ID
      * @param artifactId The library's artifact ID
@@ -185,7 +195,9 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
     /**
      * Analysis lifecycle hook that is executed when the analysis failed to obtain a version list for a given library.
      *
-     * @implNote This method may be called concurrently by multiple threads if the analysis uses parallel execution
+     * <p>
+     * <b>Note:</b>This method may be called concurrently by multiple threads if the analysis uses parallel execution
+     * </p>
      *
      * @param groupId The library's group ID
      * @param artifactId The library's artifact ID

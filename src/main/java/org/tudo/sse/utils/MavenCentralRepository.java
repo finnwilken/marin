@@ -16,7 +16,14 @@ import java.nio.charset.StandardCharsets;
  */
 public final class MavenCentralRepository {
 
+    /**
+     * The Maven Central repository base path.
+     */
     public static final String RepoBasePath = "https://repo1.maven.org/maven2/";
+
+    /**
+     * The URI representing this repository's base path.
+     */
     public static final URI RepoBaseURI = URI.create(RepoBasePath);
 
     private static MavenCentralRepository theInstance = null;
@@ -43,6 +50,7 @@ public final class MavenCentralRepository {
      * @return An input stream for the library's version list XML file
      * @throws IOException If accessing the resource fails
      * @throws FileNotFoundException If the library does not exist / does not have a version list file
+     * @throws URISyntaxException If groupId or artifactId contained invalid URI characters
      */
     public InputStream openXMLFileInputStream(String groupId, String artifactId)
             throws IOException, FileNotFoundException, URISyntaxException{

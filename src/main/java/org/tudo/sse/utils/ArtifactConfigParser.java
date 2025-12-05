@@ -4,8 +4,24 @@ import org.tudo.sse.CLIException;
 
 import java.nio.file.Path;
 
+/**
+ * Parser for ArtifactConfig objects, i.e. configurations of the {@link org.tudo.sse.analyses.MavenCentralArtifactAnalysis}.
+ * Configuration is obtained by parsing command line arguments provided as an array of strings.
+ */
 public class ArtifactConfigParser extends CommonConfigParser implements CLIParsingUtilities {
 
+    /**
+     * Creates a new artifact config parser instance.
+     */
+    public ArtifactConfigParser() { super(); }
+
+    /**
+     * Parses a given array containing JVM command line arguments into an {@link ArtifactConfig} object. Throws an exception
+     * if the given arguments are not valid.
+     * @param args Array of command line arguments, as passed by the JVM
+     * @return Corresponding {@link ArtifactConfig} if parsing was successful
+     * @throws CLIException If parsing failed. Contains details about the specific argument that was invalid.
+     */
     public ArtifactConfig parseArtifactConfig(String[] args) throws CLIException {
         final ArtifactConfig artifactConfig = new ArtifactConfig();
 
@@ -59,14 +75,34 @@ public class ArtifactConfigParser extends CommonConfigParser implements CLIParsi
         }
     }
 
+    /**
+     * Class representing the configuration of a {@link org.tudo.sse.analyses.MavenCentralArtifactAnalysis} instance.
+     */
     public static class ArtifactConfig extends CommonConfig {
 
+        /**
+         * Timestamp before which artifacts shall be excluded from analysis, or -1 if disabled.
+         */
         public long since;
+
+        /**
+         * Timestamp after which artifacts shall be excluded from analysis, or -1 if disabled.
+         */
         public long until;
 
+        /**
+         * Directory to write file outputs to, or null if disabled.
+         */
         public Path outputDirectory;
+
+        /**
+         * Whether files shall be written to the output directory.
+         */
         public boolean outputEnabled;
 
+        /**
+         * Creates a new configuration object with default values.
+         */
         public ArtifactConfig(){
             super();
 

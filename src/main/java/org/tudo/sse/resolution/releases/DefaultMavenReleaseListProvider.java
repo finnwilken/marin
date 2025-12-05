@@ -24,7 +24,7 @@ import java.util.Objects;
  *
  * @author Johannes Düsing
  */
-public class DefaultMavenReleaseListProvider extends IReleaseListProvider{
+public class DefaultMavenReleaseListProvider implements IReleaseListProvider{
 
     private final MetadataXpp3Reader reader = new MetadataXpp3Reader();
     private final MavenCentralRepository mavenRepo = MavenCentralRepository.getInstance();

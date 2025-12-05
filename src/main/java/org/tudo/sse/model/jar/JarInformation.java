@@ -186,43 +186,55 @@ public class JarInformation extends ArtifactInformation {
     }
 
     /**
+     * <p>
      * Retrieves a list of all class files contained in JAR file referenced by this ArtifactInformation. The class
      * files are returned as represented by the OPAL framework.
+     * </p>
+     * <p>
+     * <b>Note:</b> OPAL classes are not designed to be used in large scale analyses. Over time, OPAL's internal caches
+     * will continue to claim heap space that is never freed, so eventually the program will crash with an
+     * OutOfMemory error. There is currently no good way to avoid this, so use project instances only if you
+     * really need them.
+     * </p>
      * @return List of OPAL class file representations, or null if no JAR file was found
      * @throws IOException If reading the JAR file fails
-     * @implNote OPAL classes are not designed to be used in large scale analyses. Over time, OPAL's internal caches
-     *           will continue to claim heap space that is never freed, so eventually the program will crash with an
-     *           OutOfMemory error. There is currently no good way to avoid this, so use OPAL instances only if you
-     *           really need them.
      */
     public List<org.opalj.br.ClassFile> getOpalClassFileRepresentations() throws IOException {
         return getOpalClassFileRepresentations(this.ident);
     }
 
     /**
+     * <p>
      * Retrieves all class files for the JAR referenced by this ArtifactInformation, and uses them to initialize an
      * OPAL project instance. This instance can be used to conduct complex static program analyses.
+     * </p>
+     * <p>
+     * <b>Note:</b> OPAL projects are not designed to be used in large scale analyses. Over time, OPAL's internal caches
+     * will continue to claim heap space that is never freed, so eventually the program will crash with an
+     * OutOfMemory error. There is currently no good way to avoid this, so use project instances only if you
+     * really need them.
+     * </p>
      * @return The OPAL project instance, or null if no JAR file was found
      * @throws IOException If reading the JAR file fails
-     * @implNote OPAL projects are not designed to be used in large scale analyses. Over time, OPAL's internal caches
-     *           will continue to claim heap space that is never freed, so eventually the program will crash with an
-     *           OutOfMemory error. There is currently no good way to avoid this, so use project instances only if you
-     *           really need them.
      */
     public Project<String> getOpalProject() throws IOException {
         return getOpalProject(MarinOpalLogger.newInfoLogger(LogManager.getLogger("[OPAL-Project]")));
     }
 
     /**
+     * <p>
      * Retrieves all class files for the JAR referenced by this ArtifactInformation, and uses them to initialize an
      * OPAL project instance. This instance can be used to conduct complex static program analyses.
+     * </p>
+     * <p>
+     * <b>Note:</b> OPAL projects are not designed to be used in large scale analyses. Over time, OPAL's internal caches
+     * will continue to claim heap space that is never freed, so eventually the program will crash with an
+     * OutOfMemory error. There is currently no good way to avoid this, so use project instances only if you
+     * really need them.
+     * </p>
      * @return The OPAL project instance, or null if no JAR file was found
      * @param projectLogger A custom logger instance to configure the amount of output that is produced by OPAL.
      * @throws IOException If reading the JAR file fails
-     * @implNote OPAL projects are not designed to be used in large scale analyses. Over time, OPAL's internal caches
-     *           will continue to claim heap space that is never freed, so eventually the program will crash with an
-     *           OutOfMemory error. There is currently no good way to avoid this, so use project instances only if you
-     *           really need them.
      */
     public Project<String> getOpalProject(MarinOpalLogger projectLogger) throws IOException {
         try(JarInputStream jarStream = getJarInputStream()){
