@@ -7,12 +7,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
 
+/**
+ * Iterator that reads Maven Central artifact identifiers from a text file. Expects one colon-separated triple of
+ * groupID:artifactID:version per line.
+ */
 public class FileBasedArtifactIterator implements Iterator<ArtifactIdent> {
 
     private final Path inputPath;
 
     private Iterator<String> lineIterator;
 
+    /**
+     * Creates a new iterator instance for the given file path.
+     * @param input Path to a text file containing GAV triples
+     */
     public FileBasedArtifactIterator(Path input){
         this.inputPath = input;
     }

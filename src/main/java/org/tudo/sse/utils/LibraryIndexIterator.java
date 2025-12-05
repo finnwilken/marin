@@ -13,6 +13,10 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Iterator over all unique library names in the Maven Central index. A library name is a tuple of GroupId:ArtifactId,
+ * separated by a colon.
+ */
 public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
 
     private final Logger logger = LogManager.getLogger(getClass());
@@ -28,6 +32,11 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
     private String currentLibraryGA;
     private String nextLibraryGA;
 
+    /**
+     * Creates a new iterator instance for the given Maven repository.
+     * @param baseUri URI of the Maven-complient repository to iterator over
+     * @throws IOException If accessing the repository fails.
+     */
     public LibraryIndexIterator(URI baseUri) throws IOException {
         this.libraryHashesSeen = new HashSet<>();
 
@@ -43,12 +52,19 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
     }
 
 
+    /**
+     * Sets this iterator to a specific position by skipping over the given amount of entries. Aborts early if no more
+     * entries are available on the iterator.
+     *
+     * @param startIdx The iterator position to skip to
+     */
     public void setPosition(long startIdx){
         while(this.currentPosition < startIdx && this.hasNext()){
             this.next();
         }
     }
 
+    @Override
     public boolean hasNext() {
         // If currentLibraryGA is null, we have the first hasNext() call after a call to next(). We must find our new
         // currentLibraryGA first.
@@ -74,6 +90,7 @@ public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
         return this.nextLibraryGA != null;
     }
 
+    @Override
     public String next() {
         if(hasNext()){
             final String valueToReturn = this.currentLibraryGA;

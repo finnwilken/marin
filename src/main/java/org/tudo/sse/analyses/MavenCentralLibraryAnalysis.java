@@ -24,11 +24,18 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+/**
+ * Base class for analyses that process <b>libraries</b> hosted on Maven Central. For each library, all artifacts (releases)
+ * are aggregated and enriched with pom / JAR information as specified by the implementing class.
+ */
 public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
 
     private final IReleaseListProvider releaseListProvider;
     private final ResolverFactory resolverFactory;
 
+    /**
+     * The configuration for this analysis instance. Only available after runAnalysis has been called.
+     */
     protected CommonConfigParser.CommonConfig config;
 
     private ActorRef queueActorRef;
