@@ -1,11 +1,11 @@
 package org.tudo.sse.analyses;
 
-import akka.actor.ActorRef;
-import akka.actor.ActorSystem;
+import org.apache.pekko.actor.typed.ActorSystem;
 import org.tudo.sse.CLIException;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.LibraryResolutionContext;
+import org.tudo.sse.multithreading.WorkItem;
 import org.tudo.sse.multithreading.WorkloadIsFinalMessage;
 import org.tudo.sse.multithreading.ProcessLibraryMessage;
 import org.tudo.sse.multithreading.QueueActor;
@@ -38,7 +38,7 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
      */
     protected CommonConfigParser.CommonConfig config;
 
-    private ActorRef queueActorRef;
+    private ActorSystem<WorkItem> system;
     private long lastPositionSaved;
 
     /**
@@ -66,8 +66,6 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
         } catch(CLIException clix){
             throw new RuntimeException(clix);
         }
-
-        ActorSystem system = null;
 
         long currentPosition = 0L;
         // Get input iterator - this will either be from a configured input file or from the Maven Central Index. The
@@ -102,9 +100,8 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
 
         // If we want to use multiple threads, we initialize the queue actor that managers workers
         if(this.config.multipleThreads){
-            system = ActorSystem.create("marin-actors");
-            this.queueActorRef = system.actorOf(QueueActor.props(config.threadCount, system, currentPosition,
-                    config.progressWriteInterval, config.progressOutputFile), "marin-queue-actor");
+            this.system = ActorSystem.create(QueueActor.create(config.threadCount, currentPosition, config.progressWriteInterval,
+                    config.progressOutputFile), "marin-actors");
         }
 
         long entriesTaken = 0L;
@@ -146,11 +143,12 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
         }
 
         // Close actor system if it was used
-        if(system != null){
+        if(this.system != null){
             try {
                 // Tell the queue that no more work items will follow
-                this.queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
-                system.getWhenTerminated().toCompletableFuture().get();
+                this.system.tell(WorkloadIsFinalMessage.getInstance());
+                this.system.getWhenTerminated().toCompletableFuture().get();
+                this.system.close();
             } catch (Exception x) { log.warn("Error closing actor system: {}", x.getMessage());}
         }
 
@@ -229,7 +227,7 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
             process(groupId, artifactId, resolutionCtx);
         } else {
             final ProcessLibraryMessage msg = new ProcessLibraryMessage(() -> process(groupId, artifactId, resolutionCtx));
-            queueActorRef.tell(msg, ActorRef.noSender());
+            this.system.tell(msg);
         }
     }
 

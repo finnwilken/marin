@@ -1,9 +1,14 @@
 package org.tudo.sse.multithreading;
 
-import akka.actor.*;
-import akka.japi.pf.ReceiveBuilder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.pekko.actor.typed.ActorRef;
+import org.apache.pekko.actor.typed.Behavior;
+import org.apache.pekko.actor.typed.PostStop;
+import org.apache.pekko.actor.typed.javadsl.AbstractBehavior;
+import org.apache.pekko.actor.typed.javadsl.ActorContext;
+import org.apache.pekko.actor.typed.javadsl.Behaviors;
+import org.apache.pekko.actor.typed.javadsl.Receive;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -18,13 +23,13 @@ import java.util.concurrent.atomic.AtomicLong;
  * This class represents the processing queue that resolves jobs and sends them to different threads.
  * The size of the jobs and threads are determined by the configuration set in CliInformation.
  */
-public class QueueActor extends AbstractActor {
+public class QueueActor extends AbstractBehavior<WorkItem> {
 
-    private final int numResolverActors;
-    private final AtomicInteger curNumResolvers;
+    private final int maxNumberOfResolvers;
+    private final AtomicInteger currentNumberOfResolvers;
     private final Queue<WorkItem> jobQueue;
+
     private boolean indexFinished = false;
-    private final ActorSystem system;
 
     private final AtomicLong workItemsCompleted = new AtomicLong(0L);
     private final long progressSaveInterval;
@@ -33,84 +38,107 @@ public class QueueActor extends AbstractActor {
 
     private static final Logger log = LogManager.getLogger(QueueActor.class);
 
+
+    public static Behavior<WorkItem> create(int maxNumberOfResolvers,
+                                            long initialWorkItemPosition,
+                                            long progressSaveInterval,
+                                            Path progressOutputFilePath) {
+        return Behaviors.setup(ctx ->
+            new QueueActor(ctx, maxNumberOfResolvers, initialWorkItemPosition, progressSaveInterval, progressOutputFilePath)
+        );
+    }
+
     /**
      * Creates a new processing queue with the given number of actors and the given actor system.
-     * @param numResolverActors Number of ResolverActor instances that will process jobs
-     * @param system The underlying ActorSystem
+     * @param maxNumberOfResolvers Number of ResolverActor instances that will process jobs
      * @param initialWorkItemPosition The number of work items that have been skipped due to progress restore or skip
      * @param progressSaveInterval The number of completed work items after which to save progress
      * @param progressOutputFilePath The file path to which to write progress to
      */
-    public QueueActor(int numResolverActors, ActorSystem system, long initialWorkItemPosition, long progressSaveInterval, Path progressOutputFilePath) {
-        this.numResolverActors = numResolverActors;
-        this.system = system;
-        this.curNumResolvers = new AtomicInteger(0);
+    public QueueActor(ActorContext<WorkItem> ctx,
+                      int maxNumberOfResolvers,
+                      long initialWorkItemPosition,
+                      long progressSaveInterval,
+                      Path progressOutputFilePath) {
+        super(ctx);
+
+        this.maxNumberOfResolvers = maxNumberOfResolvers;
+        this.currentNumberOfResolvers = new AtomicInteger(0);
         this.jobQueue = new LinkedList<>();
 
         this.progressSaveInterval = progressSaveInterval;
         this.progressOutputFilePath = progressOutputFilePath;
         this.workItemsCompleted.set(initialWorkItemPosition);
+
+        log.info("Created queue actor");
     }
 
-    /**
-     * Creates the properties needed to initialize an actor instance of this queue
-     * @param numResolverActors The number of ResolverActor instances that shall be used to process jobs
-     * @param system The underlying ActorSystem
-     * @param initialWorkItemPosition The number of work items that have been skipped due to progress restore or skip
-     * @param progressSaveInterval The number of completed work items after which to save progress
-     * @param progressOutputFilePath The file path to which to write progress to
-     * @return The AKKA actor properties
-     */
-    public static Props props(int numResolverActors, ActorSystem system, long initialWorkItemPosition, long progressSaveInterval, Path progressOutputFilePath) {
-        return Props.create(QueueActor.class, () -> new QueueActor(numResolverActors, system, initialWorkItemPosition, progressSaveInterval, progressOutputFilePath));
+    private Behavior<WorkItem> onPostStop() {
+        log.info("Stopped QueueActor");
+        return this;
     }
 
     @Override
-    public Receive createReceive() {
-        return ReceiveBuilder.create()
-                .match(ProcessIdentifierMessage.class, this::forwardToResolvers)
-                .match(ProcessLibraryMessage.class, this::forwardToResolvers)
-                .match(WorkItemFinishedMessage.class, workItemFinishedMessage -> {
+    public Receive<WorkItem> createReceive(){
+        return newReceiveBuilder()
+                .onMessage(ProcessIdentifierMessage.class, msg -> {
+                    forwardToResolvers(msg);
+                    return Behaviors.same();
+                })
+                .onMessage(ProcessLibraryMessage.class, msg -> {
+                    forwardToResolvers(msg);
+                    return Behaviors.same();
+                })
+                .onMessage(WorkItemFinishedMessage.class, msg -> {
                     // Track completion of work items
                     workItemsCompleted.incrementAndGet();
                     // Write progress file if needed
                     writeProgressIfNeeded();
 
-                    // Distribute next job to worker that is now free, or kill worker if no jobs are left
-                    synchronized (jobQueue){
-                        if(!jobQueue.isEmpty()) {
-                            getSender().tell(jobQueue.remove(), getSelf());
-                            if(jobQueue.size() % 10 == 0) log.trace("Distributed a job, queue size {}", jobQueue.size());
+                    final ActorRef<WorkItem> sender = msg.getSender();
+
+                    synchronized (jobQueue) {
+                        if(!jobQueue.isEmpty()){
+                            WorkItem workItem = jobQueue.poll();
+                            sender.tell(workItem);
+                            if(jobQueue.size() % 10 == 0)
+                                log.trace("Distributed a job, queue size {}", jobQueue.size());
                         } else {
-                            synchronized(curNumResolvers) {
-                                if(indexFinished && curNumResolvers.get() == 1) {
-                                    log.trace("Shutting down system");
-                                    system.terminate();
+                            synchronized (currentNumberOfResolvers){
+                                if(indexFinished && currentNumberOfResolvers.get() == 1){
+                                    log.trace("Shutting down queue actor...");
+                                    return Behaviors.stopped();
                                 } else {
-                                    log.trace("Killing a worker thread");
-                                    getSender().tell(PoisonPill.getInstance(), getSelf());
-                                    curNumResolvers.decrementAndGet();
+                                    log.trace("Stopping a ResolverActor ...");
+                                    sender.tell(WorkloadIsFinalMessage.getInstance());
+                                    currentNumberOfResolvers.decrementAndGet();
                                 }
                             }
                         }
                     }
+
+                    return Behaviors.same();
                 })
-                .match(WorkloadIsFinalMessage.class, workloadIsFinalMessage -> {
-                    indexFinished = true;
-                    if(curNumResolvers.get() == 0) {
-                        system.terminate();
-                    }
+                .onMessage(WorkloadIsFinalMessage.class, msg -> {
+                    this.indexFinished = true;
+                    if(currentNumberOfResolvers.get() == 0)
+                        return Behaviors.stopped();
+                    else
+                        return Behaviors.same();
+
                 })
+                .onSignal(PostStop.class, s -> onPostStop())
                 .build();
     }
 
     private void forwardToResolvers(WorkItem message){
-        synchronized (curNumResolvers){
-            if(curNumResolvers.get() < numResolverActors) {
-                ActorRef processor = getContext().actorOf(ResolverActor.props());
-                processor.tell(message, getSelf());
-                log.info("New resolver created");
-                curNumResolvers.incrementAndGet();
+        synchronized (currentNumberOfResolvers){
+            if(currentNumberOfResolvers.get() < maxNumberOfResolvers) {
+                final ActorContext<WorkItem> ctx = getContext();
+                final String name = "resolver-" + currentNumberOfResolvers.get();
+                ActorRef<WorkItem> newResolver = ctx.spawn(ResolverActor.create(ctx.getSelf()), name);
+                currentNumberOfResolvers.incrementAndGet();
+                newResolver.tell(message);
             } else {
                 jobQueue.add(message);
             }

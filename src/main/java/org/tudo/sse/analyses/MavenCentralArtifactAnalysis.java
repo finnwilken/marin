@@ -1,7 +1,7 @@
 package org.tudo.sse.analyses;
 
-import akka.actor.ActorRef;
-import akka.actor.ActorSystem;
+import org.apache.pekko.actor.typed.ActorRef;
+import org.apache.pekko.actor.typed.ActorSystem;
 import org.tudo.sse.CLIException;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
@@ -9,6 +9,7 @@ import org.tudo.sse.model.index.IndexInformation;
 import org.tudo.sse.model.ArtifactResolutionContext;
 import org.tudo.sse.model.ResolutionContext;
 import org.tudo.sse.multithreading.ProcessIdentifierMessage;
+import org.tudo.sse.multithreading.WorkItem;
 import org.tudo.sse.multithreading.WorkloadIsFinalMessage;
 import org.tudo.sse.resolution.ResolverFactory;
 import org.tudo.sse.utils.ArtifactConfigParser;
@@ -29,7 +30,7 @@ import java.util.Iterator;
 public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis {
 
     private ArtifactConfigParser.ArtifactConfig artifactConfig;
-    private ActorRef queueActorRef;
+    private ActorSystem<WorkItem> system;
     private ResolverFactory resolverFactory;
 
 
@@ -110,8 +111,6 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
             throw new RuntimeException(clix);
         }
 
-        ActorSystem system = null;
-
         // Initialize resolver factory
         if(this.artifactConfig.outputEnabled) {
             resolverFactory = new ResolverFactory(this.artifactConfig.outputEnabled, this.artifactConfig.outputDirectory, processTransitives);
@@ -120,11 +119,9 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
         }
 
         if(this.artifactConfig.multipleThreads) {
-            system = ActorSystem.create("marin-actors");
-            // Compute position at which processing will start
-            final long initialPosition = getInitialPosition();
-            this.queueActorRef = system.actorOf(QueueActor.props(this.artifactConfig.threadCount, system, initialPosition,
-                    artifactConfig.progressWriteInterval, artifactConfig.progressOutputFile), "queueActor");
+            system = ActorSystem.create(QueueActor.create(this.artifactConfig.threadCount, getInitialPosition(),
+                    artifactConfig.progressWriteInterval, artifactConfig.progressOutputFile), "marin-actors");
+
         }
 
         // Invoke the beforeRunStart lifecycle hook
@@ -144,8 +141,9 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
         if(system != null){
             try {
                 // Tell the queue that no more work items will follow
-                this.queueActorRef.tell(WorkloadIsFinalMessage.getInstance(), ActorRef.noSender());
+                system.tell(WorkloadIsFinalMessage.getInstance());
                 system.getWhenTerminated().toCompletableFuture().get();
+                system.close();
             } catch (Exception x) { log.warn("Error closing actor system: {}", x.getMessage());}
         }
 
@@ -188,7 +186,7 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
 
     private void processIndex(Artifact current, ArtifactResolutionContext ctx) {
         if(this.artifactConfig.multipleThreads) {
-            queueActorRef.tell(new ProcessIdentifierMessage(ctx, this), ActorRef.noSender());
+            system.tell(new ProcessIdentifierMessage(ctx, this));
         } else {
             callResolver(current.getIdent(), ctx);
             analyzeArtifact(current);
@@ -339,7 +337,7 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
 
     private void processIndexIdentifier(ArtifactIdent ident, ArtifactResolutionContext ctx) {
         if(this.artifactConfig.multipleThreads){
-            queueActorRef.tell(new ProcessIdentifierMessage(ctx, this), ActorRef.noSender());
+            system.tell(new ProcessIdentifierMessage(ctx, this));
         } else {
             callResolver(ident, ctx);
             final Artifact artifact = ctx.getArtifact(ident);
