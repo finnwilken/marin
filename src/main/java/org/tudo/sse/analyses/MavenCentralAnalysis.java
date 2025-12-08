@@ -1,9 +1,9 @@
 package org.tudo.sse.analyses;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.opalj.log.GlobalLogContext$;
 import org.opalj.log.OPALLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tudo.sse.utils.MarinOpalLogger;
 
 abstract class MavenCentralAnalysis {
@@ -31,7 +31,7 @@ abstract class MavenCentralAnalysis {
     /**
      * Logger instance for subclasses
      */
-    protected final Logger log = LogManager.getLogger(getClass());
+    protected final Logger log = LoggerFactory.getLogger(getClass());
 
 
     /**

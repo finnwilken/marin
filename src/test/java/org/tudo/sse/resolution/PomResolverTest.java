@@ -2,10 +2,10 @@ package org.tudo.sse.resolution;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tudo.sse.IndexWalker;
 import org.tudo.sse.model.*;
 
@@ -37,7 +37,7 @@ class PomResolverTest {
 
     Map<String, Object> json;
     Gson gson = new Gson();
-    private static final Logger log = LogManager.getLogger(PomResolverTest.class);
+    private static final Logger log = LoggerFactory.getLogger(PomResolverTest.class);
 
     {
         InputStream resource = this.getClass().getClassLoader().getResourceAsStream("PomInputs.json");

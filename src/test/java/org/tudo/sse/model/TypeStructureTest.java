@@ -2,9 +2,9 @@ package org.tudo.sse.model;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tudo.sse.model.jar.ClassFileNode;
 import org.tudo.sse.model.jar.DefinedClassFileNode;
 import org.tudo.sse.resolution.*;
@@ -26,7 +26,7 @@ class TypeStructureTest {
     Map<String, Object> json;
     Gson gson = new Gson();
 
-    private static final Logger log = LogManager.getLogger(TypeStructureTest.class);
+    private static final Logger log = LoggerFactory.getLogger(TypeStructureTest.class);
 
     {
         InputStream resource = this.getClass().getClassLoader().getResourceAsStream("TypeStructure.json");

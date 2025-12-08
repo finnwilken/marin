@@ -1,10 +1,9 @@
 package org.tudo.sse.utils;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import org.apache.maven.index.reader.ChunkReader;
 import org.apache.maven.index.reader.IndexReader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
@@ -19,7 +18,7 @@ import java.util.Set;
  */
 public class LibraryIndexIterator implements Iterator<String>, AutoCloseable {
 
-    private final Logger logger = LogManager.getLogger(getClass());
+    private final Logger logger = LoggerFactory.getLogger(getClass());
 
     private final Set<Integer> libraryHashesSeen;
     private final Iterator<Map<String, String>> entryIterator;

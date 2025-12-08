@@ -2,8 +2,9 @@ package org.tudo.sse.model;
 
 import java.net.URI;
 import java.util.Objects;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tudo.sse.utils.MavenCentralRepository;
 
 
@@ -46,7 +47,7 @@ public class ArtifactIdent {
      */
     private String customRepository;
 
-    private static final Logger log = LogManager.getLogger(ArtifactIdent.class);
+    private static final Logger log = LoggerFactory.getLogger(ArtifactIdent.class);
 
     /**
      * Creates a new artifact identifier with the given attributes. Artifact identifiers correspond to Maven GAV-Triples.

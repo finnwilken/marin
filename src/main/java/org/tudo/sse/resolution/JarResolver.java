@@ -1,13 +1,13 @@
 package org.tudo.sse.resolution;
 
 import org.apache.commons.io.output.ByteArrayOutputStream;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.opalj.br.ClassFile;
 import org.opalj.br.Method;
 import org.opalj.br.ClassType;
 import org.opalj.br.reader.BytecodeInstructionsCache;
 import org.opalj.br.reader.Java17FrameworkWithCaching;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.jar.JarInformation;
@@ -40,7 +40,7 @@ public class JarResolver {
     private final Path pathToDirectory;
     private boolean output;
     private static final MavenCentralRepository MavenRepo = MavenCentralRepository.getInstance();
-    private static final Logger log = LogManager.getLogger(JarResolver.class);
+    private static final Logger log = LoggerFactory.getLogger(JarResolver.class);
 
     /**
      * Creates a new empty JAR resolver instance
@@ -83,7 +83,7 @@ public class JarResolver {
             try {
                 toReturn.add(parseJar(current, ctx));
             } catch (JarResolutionException e) {
-                log.error(e);
+                log.error("Failed to resolve JAR for {}", current, e);
             }
 
             count++;
@@ -148,7 +148,7 @@ public class JarResolver {
             return currentArtifact;
 
         } catch (IOException e) {
-            log.error(e);
+            log.error("IO error while accessing JAR for {}", identifier, e);
         } catch (FileNotFoundException ignored) {}
         return null;
     }

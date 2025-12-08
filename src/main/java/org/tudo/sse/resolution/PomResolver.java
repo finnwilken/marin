@@ -1,7 +1,5 @@
 package org.tudo.sse.resolution;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.apache.maven.model.*;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 
@@ -11,6 +9,8 @@ import org.eclipse.aether.util.version.GenericVersionScheme;
 import org.eclipse.aether.version.InvalidVersionSpecificationException;
 import org.eclipse.aether.version.Version;
 import org.eclipse.aether.version.VersionRange;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tudo.sse.model.*;
 import org.tudo.sse.model.pom.License;
 import org.tudo.sse.model.pom.PomInformation;
@@ -39,7 +39,7 @@ public class PomResolver {
     private static final MavenCentralRepository MavenRepo = MavenCentralRepository.getInstance();
     private final boolean resolveTransitives;
 
-    private static final Logger log = LogManager.getLogger(PomResolver.class);
+    private static final Logger log = LoggerFactory.getLogger(PomResolver.class);
     private final Map<String, Function<PomInformation, String>> predefinedPomValues;
 
     private final IReleaseListProvider releaseListProvider;
@@ -163,7 +163,7 @@ public class PomResolver {
             try {
                 poms.add(resolveArtifact(ident, ctx));
             } catch(PomResolutionException e) {
-                log.error(e);
+                log.error("Failed to resolve artifact {}", ident, e);
             } catch ( IOException e) {
                 throw new RuntimeException(e);
             } catch(FileNotFoundException ignored) {}
@@ -766,7 +766,7 @@ public class PomResolver {
             }
 
         } catch (IOException | InvalidVersionSpecificationException  e) {
-            log.error(e);
+            log.error("Failed to resolve version range", e);
         }
 
         return highestMatching;
@@ -866,7 +866,7 @@ public class PomResolver {
             if(!current.getPomInformation().getRawPomFeatures().getRepositories().isEmpty()) {
                 return resolveFromSecondaryRepo(current.getPomInformation().getRawPomFeatures().getRepositories(), toResolve, alrEncountered, exclusions, ctx);
             }
-            if(!(e instanceof FileNotFoundException)) log.error(e);
+            if(!(e instanceof FileNotFoundException)) log.error("Exception while transitively resolving dependency: {}", toResolve.getIdent(), e);
             return null;
         }
     }
@@ -890,7 +890,7 @@ public class PomResolver {
             try {
                 toReturn = recursiveResolver(toResolve.getIdent(), alrEncountered, exclusions, ctx);
             } catch (IOException | PomResolutionException e) {
-                log.error(e);
+                log.error("Exception while resolving from secondary repository: {}", toResolve.getIdent(), e);
             } catch (FileNotFoundException ignored) {}
             i++;
         }
