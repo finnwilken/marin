@@ -5,9 +5,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Acts as a logging bridge between Log4j and OPAL. A MarinOpalLogger instance can be passed when creating an OPAL
- * project, and can be configured to selectively enable certain log levels. You can pass an existing Log4j logger
- * to use as the underlying backend, otherwise the bridge will create its own Log4j logger backend.
+ * Acts as a logging bridge between SLF4J and OPAL. A MarinOpalLogger instance can be passed when creating an OPAL
+ * project, and can be configured to selectively enable certain log levels. You can pass an existing SLF4J logger
+ * to use as the underlying backend, otherwise the bridge will create its own SLF4J logger backend.
  */
 public class MarinOpalLogger implements OPALLogger {
 
