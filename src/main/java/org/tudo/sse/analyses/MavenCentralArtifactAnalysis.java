@@ -1,8 +1,9 @@
 package org.tudo.sse.analyses;
 
-import org.apache.pekko.actor.typed.ActorRef;
 import org.apache.pekko.actor.typed.ActorSystem;
 import org.tudo.sse.CLIException;
+import org.tudo.sse.analyses.config.ArtifactAnalysisConfig;
+import org.tudo.sse.analyses.config.ArtifactAnalysisConfigBuilder;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.index.IndexInformation;
@@ -12,7 +13,7 @@ import org.tudo.sse.multithreading.ProcessIdentifierMessage;
 import org.tudo.sse.multithreading.WorkItem;
 import org.tudo.sse.multithreading.WorkloadIsFinalMessage;
 import org.tudo.sse.resolution.ResolverFactory;
-import org.tudo.sse.utils.ArtifactConfigParser;
+import org.tudo.sse.analyses.config.parsing.ArtifactAnalysisConfigParser;
 import org.tudo.sse.utils.FileBasedArtifactIterator;
 import org.tudo.sse.utils.IndexIterator;
 import org.tudo.sse.multithreading.QueueActor;
@@ -29,7 +30,7 @@ import java.util.Iterator;
  */
 public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis {
 
-    private ArtifactConfigParser.ArtifactConfig artifactConfig;
+    private ArtifactAnalysisConfig artifactConfig;
     private ActorSystem<WorkItem> system;
     private ResolverFactory resolverFactory;
 
@@ -53,7 +54,7 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
         super(requiresIndex, requiresPom, requiresTransitives, requiresJar);
 
         // Initialize with default config, update later
-        artifactConfig = new ArtifactConfigParser.ArtifactConfig();
+        artifactConfig = new ArtifactAnalysisConfigBuilder().build();
     }
 
 
@@ -68,7 +69,7 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
      * Returns the CLI configuration for this analysis.
      * @return CLI information for this analysis
      */
-    public ArtifactConfigParser.ArtifactConfig getSetupInfo() {
+    public ArtifactAnalysisConfig getSetupInfo() {
         return this.artifactConfig;
     }
 
@@ -91,8 +92,8 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
             log.info("\t - Reading artifacts from Maven Central index");
             if(this.artifactConfig.progressRestoreFile != null) log.info("\t - Restoring last index position from " + this.artifactConfig.progressRestoreFile);
             if(this.artifactConfig.progressOutputFile != null)       log.info("\t - Writing last index position to " + this.artifactConfig.progressOutputFile);
-            if(this.artifactConfig.skip >= 0)          log.info("\t - Skipping " + this.artifactConfig.skip + " artifacts");
-            if(this.artifactConfig.take >= 0)          log.info("\t - Taking " + this.artifactConfig.take + " artifacts");
+            if(this.artifactConfig.hasSkip())          log.info("\t - Skipping " + this.artifactConfig.skip + " artifacts");
+            if(this.artifactConfig.hasTake())          log.info("\t - Taking " + this.artifactConfig.take + " artifacts");
             if(this.artifactConfig.since >= 0)         log.info("\t - Skipping artifacts before " + this.artifactConfig.since);
             if(this.artifactConfig.until >= 0)         log.info("\t - Taking artifacts until " + this.artifactConfig.until);
 
@@ -105,7 +106,7 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
     public final void runAnalysis(String[] args)  {
         // Obtain CLI arguments
         try {
-            this.artifactConfig = new ArtifactConfigParser().parseArtifactConfig(args);
+            this.artifactConfig = new ArtifactAnalysisConfigParser().parseArtifactConfig(args);
             printRunInfo();
         } catch(CLIException clix){
             throw new RuntimeException(clix);
@@ -168,7 +169,7 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
             final long startingPosition = getInitialPosition();
             skipN(startingPosition, indexIterator);
 
-            if(this.artifactConfig.skip != -1 && this.artifactConfig.take != -1){
+            if(this.artifactConfig.hasTake()){
                 walkPaginated(this.artifactConfig.take, indexIterator);
             } else if(this.artifactConfig.since != -1 && this.artifactConfig.until != -1){
                 walkDates(this.artifactConfig.since, this.artifactConfig.until, indexIterator);
@@ -359,7 +360,7 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
             log.info("Restoring previous progress from file (position {})", lastProgress);
 
             this.skipN(lastProgress, fileIterator);
-        } else if(this.artifactConfig.skip > 0){
+        } else if(this.artifactConfig.hasSkip()){
             // Skip configured values only if we did not restore from progress file
             log.info("Skipping {} entries from file", artifactConfig.skip);
             skipN(this.artifactConfig.skip, fileIterator);
@@ -369,10 +370,8 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
         if(!fileIterator.hasNext())
             log.warn("No more contents left to process in input file: {}", this.artifactConfig.inputListFile);
 
-        final boolean takeLimited = this.artifactConfig.take >= 0;
-
         long entriesTaken = 0L;
-        while ((!takeLimited || entriesTaken < this.artifactConfig.take) && fileIterator.hasNext()) {
+        while ((!this.artifactConfig.hasTake() || entriesTaken < this.artifactConfig.take) && fileIterator.hasNext()) {
 
             ArtifactIdent current = null;
 
@@ -421,7 +420,7 @@ public abstract class MavenCentralArtifactAnalysis extends MavenCentralAnalysis 
 
     private long getInitialPosition() {
         if(artifactConfig.progressRestoreFile != null) return getStartingPos();
-        else if(artifactConfig.skip > 0) return artifactConfig.skip;
+        else if(artifactConfig.hasSkip()) return artifactConfig.skip;
         else return 0L;
     }
 

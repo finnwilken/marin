@@ -3,8 +3,9 @@ package org.tudo.sse.analyses;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.tudo.sse.CLIException;
+import org.tudo.sse.analyses.config.LibraryAnalysisConfig;
 import org.tudo.sse.model.Artifact;
-import org.tudo.sse.utils.CommonConfigParser;
+import org.tudo.sse.analyses.config.parsing.LibraryAnalysisConfigParser;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,7 +23,7 @@ public class MavenCentralLibraryAnalysisTest {
     @DisplayName("The CLI parser must parse common argument values correctly")
     void parseCLIRegular(){
         final String validArgs = "--skip-take 20:10000 --progress-restore-file pom.xml --progress-output-file marin-progress --threads 12 --save-progress-interval 20";
-        final CommonConfigParser.CommonConfig config = parseCLI(validArgs);
+        final LibraryAnalysisConfig config = parseCLI(validArgs);
 
         assert(config.multipleThreads);
         assertEquals(12, config.threadCount);
@@ -38,7 +39,7 @@ public class MavenCentralLibraryAnalysisTest {
     @DisplayName("The CLI parser must parse common argument values correctly using shorthand argument names")
     void parseCLIShorthands(){
         final String validArgs = "-st 20:10000 -prf pom.xml -pof marin-progress -t 12 -spi 20";
-        final CommonConfigParser.CommonConfig config = parseCLI(validArgs);
+        final LibraryAnalysisConfig config = parseCLI(validArgs);
 
         assert(config.multipleThreads);
         assertEquals(12, config.threadCount);
@@ -55,7 +56,7 @@ public class MavenCentralLibraryAnalysisTest {
     @Test
     @DisplayName("The CLI parser must set the correct defaults for empty arguments")
     void parseCLIDefaults(){
-        final CommonConfigParser.CommonConfig config = parseCLI("");
+        final LibraryAnalysisConfig config = parseCLI("");
 
         assertFalse(config.multipleThreads);
         assertEquals(1, config.threadCount);
@@ -80,7 +81,7 @@ public class MavenCentralLibraryAnalysisTest {
     void parseCustomGA(){
         final String validArgs = "-st 20:10000 --inputs pom.xml";
 
-        final CommonConfigParser.CommonConfig config = parseCLI(validArgs);
+        final LibraryAnalysisConfig config = parseCLI(validArgs);
 
         assertEquals(Paths.get("pom.xml"), config.inputListFile);
         assertEquals(20, config.skip);
@@ -91,7 +92,7 @@ public class MavenCentralLibraryAnalysisTest {
     void parseNonExistingIndex(){
         final String validArgs = "--progress-restore-file pom.xml --inputs pom.xml";
 
-        final CommonConfigParser.CommonConfig config = parseCLI(validArgs);
+        final LibraryAnalysisConfig config = parseCLI(validArgs);
 
         assertEquals(Paths.get("pom.xml"), config.inputListFile);
         assertEquals(Paths.get("pom.xml"), config.progressRestoreFile);
@@ -336,10 +337,10 @@ public class MavenCentralLibraryAnalysisTest {
         return null;
     }
 
-    private CommonConfigParser.CommonConfig parseCLI(String cli) {
+    private LibraryAnalysisConfig parseCLI(String cli) {
         try {
-            if(cli.isBlank()) return new CommonConfigParser().parseCommonConfig(new String[]{});
-            else return new CommonConfigParser().parseCommonConfig(cli.split(" "));
+            if(cli.isBlank()) return new LibraryAnalysisConfigParser().parseCommonConfig(new String[]{});
+            else return new LibraryAnalysisConfigParser().parseCommonConfig(cli.split(" "));
         } catch(CLIException clix) {
             throw new RuntimeException(clix);
         }

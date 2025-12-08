@@ -1,4 +1,4 @@
-package org.tudo.sse.utils;
+package org.tudo.sse.analyses.config.parsing;
 
 import org.tudo.sse.CLIException;
 
