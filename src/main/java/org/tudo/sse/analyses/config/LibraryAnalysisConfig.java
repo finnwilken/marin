@@ -87,4 +87,12 @@ public class LibraryAnalysisConfig {
     public boolean hasTake() {
         return this.take != DEFAULT_VALUE_TAKE;
     }
+
+    /**
+     * Checks whether there is a custom input list of entities to process.
+     * @return True if there is an input list specified
+     */
+    public boolean hasInputList() {
+        return this.inputListFile != DEFAULT_VALUE_INPUT_LIST;
+    }
 }

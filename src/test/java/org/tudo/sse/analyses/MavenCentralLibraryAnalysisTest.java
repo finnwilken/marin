@@ -16,6 +16,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.tudo.sse.utils.TestUtilities.testResource;
 
 public class MavenCentralLibraryAnalysisTest {
 
@@ -328,14 +329,6 @@ public class MavenCentralLibraryAnalysisTest {
         assertFalse(librariesHit.contains("yom:yom"));
     }
 
-    private Path testResource(String pathToResource){
-        try {
-            return Path.of(Objects.requireNonNull(getClass().getClassLoader().getResource(pathToResource)).toURI());
-        } catch (Exception x){
-            fail("Test setup: Failed to load resource file " + pathToResource, x);
-        }
-        return null;
-    }
 
     private LibraryAnalysisConfig parseCLI(String cli) {
         try {

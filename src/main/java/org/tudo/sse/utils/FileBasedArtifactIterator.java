@@ -1,5 +1,6 @@
 package org.tudo.sse.utils;
 
+import org.eclipse.aether.transfer.ArtifactNotFoundException;
 import org.tudo.sse.model.ArtifactIdent;
 
 import java.io.IOException;
@@ -23,6 +24,33 @@ public class FileBasedArtifactIterator implements Iterator<ArtifactIdent> {
      */
     public FileBasedArtifactIterator(Path input){
         this.inputPath = input;
+    }
+
+    /**
+     * Checks whether the underlying file exists and contains only valid GAV triples.
+     * @throws IOException If accessing the underlying file fails
+     * @throws IllegalArgumentException If the underlying file contents are not valid
+     */
+    public void validateInput() throws IOException, IllegalArgumentException {
+        var lines = Files.readAllLines(inputPath);
+        int lineCnt = 0;
+
+        for(String line: lines){
+            final String[] parts =  line.split(":");
+            if(parts.length != 3){
+                throw new IllegalArgumentException("Not a valid GAV-Triple: " + line + " (" + inputPath.getFileName() + ":" + lineCnt + ")");
+            }
+
+            for(String part: parts){
+                if(part.isBlank()){
+                    throw new IllegalArgumentException("Not a valid GAV-Triple: " + line + " (" + inputPath.getFileName() + ":" + lineCnt + ")");
+                }
+            }
+
+            lineCnt += 1;
+        }
+
+        this.lineIterator = lines.iterator();
     }
 
     @Override

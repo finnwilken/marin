@@ -26,8 +26,16 @@ public final class ArtifactResolutionContext extends ResolutionContext {
      * Returns the identifier of the artifact for which this context was created.
      * @return ArtifactIdent for this context
      */
-    public ArtifactIdent getIdentifier() {
+    public ArtifactIdent getRootArtifactIdentifier() {
         return identifier;
+    }
+
+    /**
+     * Returns the artifact for which this context was initially created
+     * @return The root artifact of this context
+     */
+    public Artifact getRootArtifact() {
+        return this.createArtifact(getRootArtifactIdentifier());
     }
 
 }

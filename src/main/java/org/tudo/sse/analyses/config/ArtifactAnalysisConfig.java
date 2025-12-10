@@ -45,5 +45,13 @@ public class ArtifactAnalysisConfig extends LibraryAnalysisConfig {
         outputDirectory = DEFAULT_VALUE_OUTPUT;
     }
 
+    /**
+     * Checks whether there is a custom time range to filter artifacts for.
+     * @return True if time based filtering is enabled
+     */
+    public boolean hasTimeBasedFiltering(){
+        return this.since != DEFAULT_VALUE_SINCE && this.until != DEFAULT_VALUE_UNTIL;
+    }
+
 
 }
