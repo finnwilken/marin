@@ -14,7 +14,7 @@ import org.tudo.sse.multithreading.WorkItem;
 import org.tudo.sse.multithreading.WorkloadIsFinalMessage;
 import org.tudo.sse.resolution.ResolverFactory;
 import org.tudo.sse.analyses.config.parsing.ArtifactAnalysisConfigParser;
-import org.tudo.sse.utils.FileBasedArtifactIterator;
+import org.tudo.sse.analyses.input.FileBasedArtifactIterator;
 import org.tudo.sse.utils.IndexIterator;
 import org.tudo.sse.multithreading.QueueActor;
 import org.tudo.sse.utils.MavenCentralRepository;

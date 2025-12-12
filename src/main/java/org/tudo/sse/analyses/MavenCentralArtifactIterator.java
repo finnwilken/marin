@@ -3,12 +3,11 @@ package org.tudo.sse.analyses;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tudo.sse.analyses.config.ArtifactAnalysisConfig;
-import org.tudo.sse.analyses.config.LibraryAnalysisConfig;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactResolutionContext;
 import org.tudo.sse.model.index.IndexInformation;
 import org.tudo.sse.resolution.ResolverFactory;
-import org.tudo.sse.utils.FileBasedArtifactIterator;
+import org.tudo.sse.analyses.input.FileBasedArtifactIterator;
 import org.tudo.sse.utils.IndexIterator;
 import org.tudo.sse.utils.MavenCentralRepository;
 
@@ -21,8 +20,7 @@ import java.util.Iterator;
  *
  * @author Johannes Düsing
  */
-@SuppressWarnings("this-escape")
-public class MavenCentralArtifactIterator implements Iterator<Artifact>, AnalysisUtils {
+public class MavenCentralArtifactIterator implements Iterator<Artifact> {
 
     private final Logger log = LoggerFactory.getLogger(MavenCentralArtifactIterator.class);
     private final ArtifactAnalysisConfig config;
@@ -119,20 +117,15 @@ public class MavenCentralArtifactIterator implements Iterator<Artifact>, Analysi
         return artifact;
     }
 
-    @Override
-    public LibraryAnalysisConfig getConfig(){
-        return this.config;
-    }
-
     private void writePositionIfNeeded(){
         if(this.currentPosition - this.lastPositionSaved > this.config.progressWriteInterval){
-            this.writePosition(this.currentPosition);
+            AnalysisUtils.writePosition(this.currentPosition, this.config);
             this.lastPositionSaved = this.currentPosition;
         }
     }
 
     private void skipInitial(){
-        final long entitiesToSkip = getInitialPosition();
+        final long entitiesToSkip = AnalysisUtils.getInitialPosition(this.config);
 
         if(entitiesToSkip > 0L && this.badSource)
             return;
@@ -176,6 +169,7 @@ public class MavenCentralArtifactIterator implements Iterator<Artifact>, Analysi
         private boolean _needsUpdate = true;
         private boolean _hasNext = false;
         private IndexInformation _nextInfo = null;
+        private boolean _indexClosed = false;
 
         MavenCentralIndexArtifactSource() throws IOException {
             this.index = new IndexIterator(MavenCentralRepository.RepoBaseURI);
@@ -206,6 +200,14 @@ public class MavenCentralArtifactIterator implements Iterator<Artifact>, Analysi
                 findNext();
                 _needsUpdate = false;
             }
+
+            // If we have no more entries on the underlying index, we should close it to release resources
+            if(!_hasNext && !_indexClosed){
+                try { this.index.closeReader(); }
+                catch (IOException ignored) {}
+                this._indexClosed = true;
+            }
+
             return _hasNext;
         }
 
