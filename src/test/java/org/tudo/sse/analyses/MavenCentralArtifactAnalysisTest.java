@@ -238,17 +238,17 @@ class MavenCentralArtifactAnalysisTest {
     @DisplayName("An analysis must correctly apply CLI options when reading custom input lists")
     void readIdentsIn() {
         List<String[]> cliInputs = new ArrayList<>();
-        String[] args = {"--inputs", "src/main/resources/coordinates.txt"};
+        String[] args = {"--inputs", "src/test/resources/artifact-names-valid.txt"};
         cliInputs.add(args);
-        args = new String[] {"--inputs", "src/main/resources/coordinates.txt", "-pof", "src/test/resources/stop.txt"};
+        args = new String[] {"--inputs", "src/test/resources/artifact-names-valid.txt", "-pof", "src/test/resources/stop.txt"};
         cliInputs.add(args);
-        args = new String[]{"--inputs", "src/main/resources/coordinates.txt", "-st", "4:5"};
+        args = new String[]{"--inputs", "src/test/resources/artifact-names-valid.txt", "-st", "4:5"};
         cliInputs.add(args);
-        args = new String[]{"--inputs", "src/main/resources/coordinates.txt", "-st", "4:5", "-pof", "src/test/resources/stop.txt"};
+        args = new String[]{"--inputs", "src/test/resources/artifact-names-valid.txt", "-st", "4:5", "-pof", "src/test/resources/stop.txt"};
         cliInputs.add(args);
-        args = new String[]{"--inputs", "src/main/resources/coordinates.txt", "-prf", "src/test/resources/testingIndexPosition.txt"};
+        args = new String[]{"--inputs", "src/test/resources/artifact-names-valid.txt", "-prf", "src/test/resources/testingIndexPosition.txt"};
         cliInputs.add(args);
-        args = new String[]{"--inputs", "src/main/resources/coordinates.txt", "-prf", "src/test/resources/testingIndexPosition.txt", "-pof", "src/test/resources/stop.txt"};
+        args = new String[]{"--inputs", "src/test/resources/artifact-names-valid.txt", "-prf", "src/test/resources/testingIndexPosition.txt", "-pof", "src/test/resources/stop.txt"};
         cliInputs.add(args);
 
         List<List<String>> expected = (List<List<String>>) json.get("readIdentsIn");
@@ -292,8 +292,8 @@ class MavenCentralArtifactAnalysisTest {
         singleArgs.add(new String[]{"-st", "10:1000"});
         multiArgs.add(new String[]{"--threads", "5", "-st", "10:1000"});
 
-        singleArgs.add(new String[]{"--inputs", "src/main/resources/coordinates.txt"});
-        multiArgs.add(new String[]{"--threads", "5", "--inputs", "src/main/resources/coordinates.txt"});
+        singleArgs.add(new String[]{"--inputs", "src/test/resources/artifact-names-valid.txt"});
+        multiArgs.add(new String[]{"--threads", "5", "--inputs", "src/test/resources/artifact-names-valid.txt"});
 
         for(int i = 0; i < singleArgs.size(); i++) {
 

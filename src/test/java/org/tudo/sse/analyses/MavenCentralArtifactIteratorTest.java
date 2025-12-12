@@ -16,14 +16,13 @@ import org.tudo.sse.utils.MavenCentralRepository;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.tudo.sse.utils.TestUtilities.testResource;
 
 public class MavenCentralArtifactIteratorTest {
 
-    private final Path gavInputList = Paths.get("src/main/resources/coordinates.txt");
+    private final Path gavInputList = testResource("artifact-names-valid.txt");
 
     @BeforeAll
     static void setUp() {
