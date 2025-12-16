@@ -39,7 +39,7 @@
     <properties>
         <maven.compiler.release>11</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <scala.binary.version>2.13</scala.binary.version>
+        <scala.binary.version>3</scala.binary.version>
     </properties>
 
     <dependencyManagement>
@@ -78,7 +78,7 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.5.13</version>
+            <version>1.5.19</version>
             <scope>test</scope>
         </dependency>
         <!-- https://mvnrepository.com/artifact/com.google.code.gson/gson -->
@@ -111,7 +111,7 @@
         <dependency>
             <groupId>de.opal-project</groupId>
             <artifactId>framework_${scala.binary.version}</artifactId>
-            <version>6.0.0</version>
+            <version>7.0.0</version>
         </dependency>
 
         <!-- The following dependencies are pinned (lower bound) to avoid vulnerabilities in transitive dependencies -->
