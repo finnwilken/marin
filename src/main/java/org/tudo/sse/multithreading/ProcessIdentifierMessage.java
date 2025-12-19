@@ -28,7 +28,7 @@ public class ProcessIdentifierMessage implements WorkItem {
      * @return The artifact identifier
      */
     public ArtifactIdent getIdentifier() {
-        return this.artifactCtx.getIdentifier();
+        return this.artifactCtx.getRootArtifactIdentifier();
     }
 
     /**

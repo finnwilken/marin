@@ -2,6 +2,7 @@ package org.tudo.sse.analyses;
 
 import org.apache.pekko.actor.typed.ActorSystem;
 import org.tudo.sse.CLIException;
+import org.tudo.sse.analyses.config.LibraryAnalysisConfig;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.LibraryResolutionContext;
@@ -12,7 +13,7 @@ import org.tudo.sse.multithreading.QueueActor;
 import org.tudo.sse.resolution.ResolverFactory;
 import org.tudo.sse.resolution.releases.DefaultMavenReleaseListProvider;
 import org.tudo.sse.resolution.releases.IReleaseListProvider;
-import org.tudo.sse.utils.CommonConfigParser;
+import org.tudo.sse.analyses.config.parsing.LibraryAnalysisConfigParser;
 import org.tudo.sse.utils.LibraryIndexIterator;
 import org.tudo.sse.utils.MavenCentralRepository;
 
@@ -36,7 +37,7 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
     /**
      * The configuration for this analysis instance. Only available after runAnalysis has been called.
      */
-    protected CommonConfigParser.CommonConfig config;
+    protected LibraryAnalysisConfig config;
 
     private ActorSystem<WorkItem> system;
     private long lastPositionSaved;
@@ -61,7 +62,7 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
     public final void runAnalysis(String[] args){
         // Obtain CLI arguments
         try {
-            this.config = new CommonConfigParser().parseCommonConfig(args);
+            this.config = new LibraryAnalysisConfigParser().parseCommonConfig(args);
             printRunInfo();
         } catch(CLIException clix){
             throw new RuntimeException(clix);
@@ -84,9 +85,9 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
                 currentPosition += 1L;
             }
             // Notify users that skip will not be applied
-            if(config.skip > 0)
+            if(config.hasSkip())
                 log.info("Not applying skip value because progress was restored from previous run");
-        } else if(config.skip > 0){
+        } else if(config.hasSkip()){
             // We only apply a skip if we did not restore previous progress
             log.info("Skipping {} library names", config.skip);
             for(int i = 0; i < config.skip; i++){
@@ -106,7 +107,7 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
 
         long entriesTaken = 0L;
 
-        if(config.take >= 0)
+        if(config.hasTake())
             log.info("Taking {} library names", config.take);
 
         // Invoke the beforeRunStart lifecycle hook
@@ -119,7 +120,7 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
 
         // If specified, we only take the configured amount of entries. If not, we process as long as the iterator
         // provides new entries
-        while((config.take < 0 || entriesTaken < config.take) && gaIterator.hasNext()){
+        while((!config.hasTake()|| entriesTaken < config.take) && gaIterator.hasNext()){
             processEntry(gaIterator.next());
 
             entriesTaken += 1L;
@@ -336,8 +337,8 @@ public abstract class MavenCentralLibraryAnalysis extends MavenCentralAnalysis {
             log.info("\t - Reading libraries from Maven Central index");
             if(config.progressRestoreFile != null) log.info("\t - Restoring last index position from " + config.progressRestoreFile);
             if(config.progressOutputFile != null)  log.info("\t - Writing last index position to " + config.progressOutputFile);
-            if(config.skip >= 0)                   log.info("\t - Skipping " + config.skip + " artifacts");
-            if(config.take >= 0)                   log.info("\t - Taking " + config.take + " artifacts");
+            if(config.hasSkip())                   log.info("\t - Skipping " + config.skip + " artifacts");
+            if(config.hasTake())                   log.info("\t - Taking " + config.take + " artifacts");
         } else {
             log.info("\t - Reading libraries from GA-list at " + config.inputListFile);
         }

@@ -5,12 +5,13 @@ import com.google.gson.reflect.TypeToken;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.tudo.sse.CLIException;
+import org.tudo.sse.analyses.config.ArtifactAnalysisConfig;
 import org.tudo.sse.model.Artifact;
 import org.tudo.sse.model.ArtifactIdent;
 import org.tudo.sse.model.index.Package;
 import org.tudo.sse.model.pom.License;
 import org.tudo.sse.model.pom.PomInformation;
-import org.tudo.sse.utils.ArtifactConfigParser;
+import org.tudo.sse.analyses.config.parsing.ArtifactAnalysisConfigParser;
 import org.tudo.sse.utils.IndexIterator;
 import org.tudo.sse.utils.MavenCentralAnalysisFactory;
 import scala.Tuple2;
@@ -43,11 +44,11 @@ class MavenCentralArtifactAnalysisTest {
     void parseCLIRegular() throws IOException{
         Path tmpDir = Files.createTempDirectory("maven-resolution-files");
 
-        ArtifactConfigParser.ArtifactConfig[] configs = new  ArtifactConfigParser.ArtifactConfig[]{
+        ArtifactAnalysisConfig[] configs = new  ArtifactAnalysisConfig[]{
                 parseCLI("--skip-take 500:223"),
                 parseCLI("--inputs src/test/resources/localPom.xml"),
                 parseCLI("--progress-restore-file src/test/resources/localPom.xml --inputs src/test/resources/localPom.xml"),
-                parseCLI("--since-until 53245:13243"),
+                parseCLI("--since-until 53245:53246"),
                 parseCLI("--inputs src/test/resources/localPom.xml --progress-restore-file src/test/resources/localPom.xml"),
                 parseCLI("--progress-restore-file src/test/resources/localPom.xml"),
                 parseCLI("--output " + tmpDir.toString())
@@ -57,7 +58,7 @@ class MavenCentralArtifactAnalysisTest {
 
         for(int i = 0; i < configs.length; i++){
             final List<String> currExpected = expected.get(i);
-            final ArtifactConfigParser.ArtifactConfig currConfig = configs[i];
+            final ArtifactAnalysisConfig currConfig = configs[i];
 
             assertEquals(asInt(currExpected.get(0)), currConfig.skip);
             assertEquals(asInt(currExpected.get(1)), currConfig.take);
@@ -89,11 +90,11 @@ class MavenCentralArtifactAnalysisTest {
     void parseCLIShorthands() throws IOException{
         Path tmpDir = Files.createTempDirectory("maven-resolution-files");
 
-        ArtifactConfigParser.ArtifactConfig[] configs = new  ArtifactConfigParser.ArtifactConfig[]{
+        ArtifactAnalysisConfig[] configs = new  ArtifactAnalysisConfig[]{
                 parseCLI("-st 500:223"),
                 parseCLI("-i src/test/resources/localPom.xml"),
                 parseCLI("-prf src/test/resources/localPom.xml -i src/test/resources/localPom.xml"),
-                parseCLI("-su 53245:13243"),
+                parseCLI("-su 53245:53246"),
                 parseCLI("-i src/test/resources/localPom.xml -prf src/test/resources/localPom.xml"),
                 parseCLI("-prf src/test/resources/localPom.xml"),
                 parseCLI("-o " + tmpDir.toString())
@@ -103,7 +104,7 @@ class MavenCentralArtifactAnalysisTest {
 
         for(int i = 0; i < configs.length; i++){
             final List<String> currExpected = expected.get(i);
-            final ArtifactConfigParser.ArtifactConfig currConfig = configs[i];
+            final ArtifactAnalysisConfig currConfig = configs[i];
 
             assertEquals(asInt(currExpected.get(0)), currConfig.skip);
             assertEquals(asInt(currExpected.get(1)), currConfig.take);
@@ -138,6 +139,7 @@ class MavenCentralArtifactAnalysisTest {
         cliInputs.add("--inputs -/xcd/");
         cliInputs.add("-st 88880000 -su --inputs path/to/file -ip path/to/file");
         cliInputs.add("--inputs");
+        cliInputs.add("--since-until 53245:13243");
 
 
         for(String input : cliInputs) {
@@ -236,17 +238,17 @@ class MavenCentralArtifactAnalysisTest {
     @DisplayName("An analysis must correctly apply CLI options when reading custom input lists")
     void readIdentsIn() {
         List<String[]> cliInputs = new ArrayList<>();
-        String[] args = {"--inputs", "src/main/resources/coordinates.txt"};
+        String[] args = {"--inputs", "src/test/resources/artifact-names-valid.txt"};
         cliInputs.add(args);
-        args = new String[] {"--inputs", "src/main/resources/coordinates.txt", "-pof", "src/test/resources/stop.txt"};
+        args = new String[] {"--inputs", "src/test/resources/artifact-names-valid.txt", "-pof", "src/test/resources/stop.txt"};
         cliInputs.add(args);
-        args = new String[]{"--inputs", "src/main/resources/coordinates.txt", "-st", "4:5"};
+        args = new String[]{"--inputs", "src/test/resources/artifact-names-valid.txt", "-st", "4:5"};
         cliInputs.add(args);
-        args = new String[]{"--inputs", "src/main/resources/coordinates.txt", "-st", "4:5", "-pof", "src/test/resources/stop.txt"};
+        args = new String[]{"--inputs", "src/test/resources/artifact-names-valid.txt", "-st", "4:5", "-pof", "src/test/resources/stop.txt"};
         cliInputs.add(args);
-        args = new String[]{"--inputs", "src/main/resources/coordinates.txt", "-prf", "src/test/resources/testingIndexPosition.txt"};
+        args = new String[]{"--inputs", "src/test/resources/artifact-names-valid.txt", "-prf", "src/test/resources/testingIndexPosition.txt"};
         cliInputs.add(args);
-        args = new String[]{"--inputs", "src/main/resources/coordinates.txt", "-prf", "src/test/resources/testingIndexPosition.txt", "-pof", "src/test/resources/stop.txt"};
+        args = new String[]{"--inputs", "src/test/resources/artifact-names-valid.txt", "-prf", "src/test/resources/testingIndexPosition.txt", "-pof", "src/test/resources/stop.txt"};
         cliInputs.add(args);
 
         List<List<String>> expected = (List<List<String>>) json.get("readIdentsIn");
@@ -290,8 +292,8 @@ class MavenCentralArtifactAnalysisTest {
         singleArgs.add(new String[]{"-st", "10:1000"});
         multiArgs.add(new String[]{"--threads", "5", "-st", "10:1000"});
 
-        singleArgs.add(new String[]{"--inputs", "src/main/resources/coordinates.txt"});
-        multiArgs.add(new String[]{"--threads", "5", "--inputs", "src/main/resources/coordinates.txt"});
+        singleArgs.add(new String[]{"--inputs", "src/test/resources/artifact-names-valid.txt"});
+        multiArgs.add(new String[]{"--threads", "5", "--inputs", "src/test/resources/artifact-names-valid.txt"});
 
         for(int i = 0; i < singleArgs.size(); i++) {
 
@@ -383,9 +385,9 @@ class MavenCentralArtifactAnalysisTest {
         }
     }
 
-    private ArtifactConfigParser.ArtifactConfig parseCLI(String cli) {
+    private ArtifactAnalysisConfig parseCLI(String cli) {
         try {
-            final ArtifactConfigParser parser = new ArtifactConfigParser();
+            final ArtifactAnalysisConfigParser parser = new ArtifactAnalysisConfigParser();
             if(cli.isBlank()) return parser.parseArtifactConfig(new String[] {});
             else return parser.parseArtifactConfig(cli.split(" "));
         } catch(CLIException clix){

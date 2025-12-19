@@ -41,7 +41,14 @@ Both analysis types provide a method called `void runAnalysis(String[] args)`. I
 | `-o <dir>` <br/> `--output <dir>`                          | Yes                   | No                   | Output directory to optionally write processed <br/> artifacts to. Depending on the artifact information<br/> required by the analysis, this can be `pom.xml`<br/>files, `*.jar` files or GAV triple. Not used by default. | `-o ./jars-processed/` |
 
 
+If you do not want to extend one of the aforementioned base classes, MARIN also provides corresponding implementations of the `java.util.Iterator` interface to enumerate and enrich artifacts or libraries. Note that those implementations are **not threadsafe** and cannot perform resolution in parallel. MARIN provides:
+* The `MavenCentralArtifactIterator extends Iterator<Artifact>` is the equivalent to the `MavenCentralArtifactAnalysis` and supports all configuration options besides `--threads`.
+* The `MavenCentralLibraryIterator extends Iterator<LibraryResolutionContext>` is the equivalent to the `MavenCentralLibraryAnalysis` and supports all configuration options besides `--threads`.
+
 ## Usage
+When using MARIN, you can decide whether to extend one of the  abstract base classes available, or to rely on of the analysis-equivalent implementations of `java.util.Iterator`.
+
+### Extending Abstract Base Classes
 To use MARIN, you will need to implement two components:
 1. You need an implementation of either the abstract class `MavenCentralArtifactAnalysis` or `MavenCentralLibraryAnalysis`. This is your actual analysis implementation that defines how a single artifact or library shall be processed.
 2. You need a runner class that passes command line arguments to your analysis implementation. Usually, this will look like this:
@@ -63,6 +70,28 @@ public class AnalysisRunner {
 ```
 Once this is implemented, you can run your analysis using the following command. Any of the above-mentioned CLI arguments will work for your analysis implementation.
 ```java -jar executableName *INSERT CLI HERE* ```
+
+### Using Iterators
+As opposed to extending a base class, in order to use MARIN's iterator implementations you will have to first create an analysis configuration object programmatically. This can be done using the `ArtifactAnalysisConfigBuilder` or `LibraryAnalysisConfigBuilder` classes, respectively. The following example shows how to first build a configuration, and then use it to initialize a `MavenCentralArtifactIterator`.
+```java
+final boolean resolvePom = true;
+final boolean resolveTransitive = false;
+final boolean resolveJar = true;
+final Path gavInputList = Paths.get("path-to-input-file");
+
+final ArtifactAnalysisConfig config = new ArtifactAnalysisConfigBuilder()
+                .withInputList(gavInputList)
+                .withSkip(2)
+                .withTake(5)
+                .build();
+
+MavenCentralArtifactIterator iterator = new MavenCentralArtifactIterator(resolvePom, resolveTransitive, resolveJar, config);
+
+while(iterator.hasNext()){
+    Artifact current = iterator.next();
+    // TODO: Process artifact
+}
+```
 
 ## Example Use Cases:
 In the following, there are some example implementations of `MavenCentralArtifactAnalysis`. All of them can be used with the same `AnalysisRunner` implementation seen above, just replace `MyAnalysisImplementation` with the actual implementation name.
