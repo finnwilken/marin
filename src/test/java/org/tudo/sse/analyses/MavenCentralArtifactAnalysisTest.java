@@ -112,10 +112,12 @@ class MavenCentralArtifactAnalysisTest {
     @Test
     @DisplayName("The CLI parser must parse UNIX timestamps")
     void parseCLITimestamps2() {
-        var config = parseCLI("-su 2010-10-10:1321006271");
+        var config = parseCLI("-su 2010-10-10:1321009871");
 
         var since = asDate(config.since);
         var until = asDate(config.until);
+
+        assertEquals(1321009871000L, config.until);
 
         assertEquals(2010, since.getYear());
         assertEquals(10, since.getMonthValue());
@@ -460,6 +462,6 @@ class MavenCentralArtifactAnalysisTest {
 
     private ZonedDateTime asDate(long timestamp){
         Instant i = Instant.ofEpochMilli(timestamp);
-        return ZonedDateTime.ofInstant(i, ZoneId.systemDefault());
+        return ZonedDateTime.ofInstant(i, ZoneId.of("GMT"));
     }
 }

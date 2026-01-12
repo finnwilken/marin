@@ -7,10 +7,8 @@ import org.tudo.sse.analyses.config.InvalidConfigurationException;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.time.DateTimeException;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Date;
 
@@ -19,6 +17,8 @@ import java.util.Date;
  * Configuration is obtained by parsing command line arguments provided as an array of strings.
  */
 public class ArtifactAnalysisConfigParser extends LibraryAnalysisConfigParser implements CLIParsingUtilities {
+
+    private static final ZoneId GMT_ZONE = ZoneId.of("GMT");
 
     /**
      * Creates a new artifact config parser instance.
@@ -78,7 +78,7 @@ public class ArtifactAnalysisConfigParser extends LibraryAnalysisConfigParser im
         try {
             long timestamp = Long.parseLong(value);
             Instant s = Instant.ofEpochSecond(timestamp);
-            date = s.atZone(ZoneId.systemDefault());
+            date = s.atZone(GMT_ZONE);
         } catch (NumberFormatException ignored){
             date = parseYYYYMMDD(value, attrName);
             // Parsing a date will create a (local) time of 00:00:00 - we want to add one day if requested
@@ -96,13 +96,13 @@ public class ArtifactAnalysisConfigParser extends LibraryAnalysisConfigParser im
     }
 
     private ZonedDateTime parseYYYYMMDD(String value, String attrName) throws CLIException {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("uuuu-MM-dd");
 
         try {
-            return sdf.parse(value).toInstant().atZone(ZoneId.systemDefault());
-        } catch (ParseException px){
+            return LocalDate.parse(value, dtf).atStartOfDay(GMT_ZONE);
+        } catch (DateTimeParseException dtpx) {
             var exception = new CLIException("Not a valid date of format YYYY-MM-DD", attrName);
-            exception.initCause(px);
+            exception.initCause(dtpx);
             throw exception;
         }
     }
