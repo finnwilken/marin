@@ -21,6 +21,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -82,6 +85,61 @@ class MavenCentralArtifactAnalysisTest {
             }
 
             assertEquals(Boolean.parseBoolean(currExpected.get(6)), currConfig.outputEnabled);
+        }
+    }
+
+    @Test
+    @DisplayName("The CLI parser must parse timestamps YYYY-MM-DD format")
+    void parseCLITimestamps1() {
+        var config = parseCLI("-su 2025-12-01:2025-12-31");
+
+        var since = asDate(config.since);
+        var until = asDate(config.until);
+
+        assertEquals(2025, since.getYear());
+        assertEquals(12, since.getMonthValue());
+        assertEquals(1, since.getDayOfMonth());
+        assertEquals(0, since.getHour());
+        assertEquals(0, since.getMinute());
+
+        assertEquals(2025, until.getYear());
+        assertEquals(12, until.getMonthValue());
+        assertEquals(31, until.getDayOfMonth());
+        assertEquals(23, until.getHour());
+        assertEquals(59, until.getMinute());
+    }
+
+    @Test
+    @DisplayName("The CLI parser must parse UNIX timestamps")
+    void parseCLITimestamps2() {
+        var config = parseCLI("-su 2010-10-10:1321006271");
+
+        var since = asDate(config.since);
+        var until = asDate(config.until);
+
+        assertEquals(2010, since.getYear());
+        assertEquals(10, since.getMonthValue());
+        assertEquals(10, since.getDayOfMonth());
+        assertEquals(0, since.getHour());
+        assertEquals(0, since.getMinute());
+
+        assertEquals(2011, until.getYear());
+        assertEquals(11, until.getMonthValue());
+        assertEquals(11, until.getDayOfMonth());
+        assertEquals(11, until.getHour());
+        assertEquals(11, until.getMinute());
+        assertEquals(11, until.getSecond());
+    }
+
+    @Test
+    @DisplayName("The CLI parser must reject invalid ranges")
+    void parseCLIInvalidRanges() {
+        try {
+            parseCLI("-su 1321006271:2010-10-10");
+            fail("The CLI parser must reject invalid ranges");
+        } catch(Exception x){
+            assertInstanceOf(RuntimeException.class, x);
+            assertInstanceOf(CLIException.class, x.getCause());
         }
     }
 
@@ -400,5 +458,8 @@ class MavenCentralArtifactAnalysisTest {
         return Integer.parseInt(s);
     }
 
-
+    private ZonedDateTime asDate(long timestamp){
+        Instant i = Instant.ofEpochMilli(timestamp);
+        return ZonedDateTime.ofInstant(i, ZoneId.systemDefault());
+    }
 }
