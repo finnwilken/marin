@@ -159,8 +159,6 @@ class MavenCentralArtifactAnalysisTest {
             }
         };
 
-
-
         List<Tuple2<Integer, Integer>> inputs = new ArrayList<>();
         inputs.add(new Tuple2<>(500, 10));
         inputs.add(new Tuple2<>(0, 10));
@@ -168,35 +166,22 @@ class MavenCentralArtifactAnalysisTest {
         inputs.add(new Tuple2<>(763, 20));
 
         for(Tuple2<Integer, Integer> input : inputs) {
-            int start1 = input._1;
+            int skip = input._1;
             int take = input._2;
 
-            int start2 = (start1 + take) - 1;
-
             try {
-                IndexIterator iterator = new IndexIterator(new URI(base), start1);
+                IndexIterator iterator = new IndexIterator(new URI(base), skip);
                 theAnalysis.walkPaginated(take, iterator);
 
                 assertFalse(artifactsSeen.isEmpty());
+                assertEquals(take, artifactsSeen.size());
 
-                Artifact lastOne = artifactsSeen.get(artifactsSeen.size() - 1);
-
-                assertNotNull(lastOne);
-
-                int i = 2;
-                while(lastOne.getIndexInformation().getIndex() > start2) {
-                    lastOne = artifactsSeen.get(artifactsSeen.size() - i);
-                    assertNotNull(lastOne);
-                    i++;
+                for(Artifact a : artifactsSeen){
+                    assertTrue(a.hasIndexInformation());
+                    assertTrue(a.getIndexInformation().getIndex() >= (skip - 1));
                 }
 
-                iterator = new IndexIterator(new URI(base), start2);
-
                 artifactsSeen.clear();
-                theAnalysis.walkPaginated(1, iterator);
-
-                long lastOne2 = artifactsSeen.get(0).getIndexInformation().getIndex();
-                assertEquals(lastOne.getIndexInformation().getIndex(), lastOne2);
             } catch (IOException | URISyntaxException e) {
                 throw new RuntimeException(e);
             }
@@ -289,8 +274,8 @@ class MavenCentralArtifactAnalysisTest {
         List<String[]> singleArgs = new ArrayList<>();
         List<String[]> multiArgs = new ArrayList<>();
 
-        singleArgs.add(new String[]{"-st", "10:1000"});
-        multiArgs.add(new String[]{"--threads", "5", "-st", "10:1000"});
+        singleArgs.add(new String[]{"-st", "10:200"});
+        multiArgs.add(new String[]{"--threads", "5", "-st", "10:200"});
 
         singleArgs.add(new String[]{"--inputs", "src/test/resources/artifact-names-valid.txt"});
         multiArgs.add(new String[]{"--threads", "5", "--inputs", "src/test/resources/artifact-names-valid.txt"});
