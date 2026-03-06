@@ -23,7 +23,10 @@ import java.util.regex.Pattern;
 
 public class IndexIterator implements Iterator<IndexInformation> {
 
-    public static final String splitPattern = Pattern.quote("|");
+    /**
+     * Pattern to split Lucene Index entries at
+     */
+    private static final String splitPattern = Pattern.quote("|");
 
     private long index;
 
