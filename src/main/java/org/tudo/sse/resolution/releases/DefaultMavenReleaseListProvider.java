@@ -21,8 +21,9 @@ import java.util.Objects;
 
 /**
  * This default implementation of IReleaseListProvider obtains a list of releases for a given GA-Tuple by
- * querying the maven-metadata.xml file hosted on Maven Central. It will throw an IOException if file
- * access files for any given reason.
+ * querying the maven-metadata.xml file hosted on Maven Central. If the file it not present, it will attempt
+ * to obtain a list of release versions from the HTML list provided by Maven Central. If both attempts fail,
+ * an IOException will be thrown.
  *
  * @author Johannes Düsing
  */
