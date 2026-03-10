@@ -401,4 +401,18 @@ class PomResolverTest {
             }
         }
     }
+
+    @Test
+    @DisplayName("The POM resolver must not loop for circular dependencies")
+    void resolveDependencyLoop() {
+        // Based on https://github.com/sse-labs/marin/issues/52
+        final ArtifactIdent loopingArtifact = new ArtifactIdent("net.wicp.tams", "ts-maven-plugin", "8.0.2");
+        final ArtifactResolutionContext freshCtx = ArtifactResolutionContext.newInstance(loopingArtifact);
+
+        final Artifact artifact = pomResolver.resolveArtifacts(List.of(loopingArtifact), freshCtx).get(0);
+
+        assertNotNull(artifact);
+
+
+    }
 }
