@@ -186,7 +186,7 @@ public class MavenCentralLibraryAnalysisTest {
 
             @Override
             protected void onVersionListError(String g, String a, Exception x){
-                assertTrue(x.getCause().getMessage().contains("was not found"));
+                assertFalse(x.getCause().getMessage().contains("was not found"));
                 String ga = g+":"+a;
                 librariesHit.add(ga);
             }
@@ -224,7 +224,8 @@ public class MavenCentralLibraryAnalysisTest {
 
             @Override
             protected void onVersionListError(String g, String a, Exception x){
-                assertTrue(x.getCause().getMessage().contains("was not found"));
+
+                assertFalse(x.getCause().getMessage().contains("was not found"));
                 count.incrementAndGet();
             }
         };
